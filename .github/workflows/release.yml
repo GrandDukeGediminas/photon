@@ -1,0 +1,86 @@
+# Release: push a tag named v<version> (e.g. v0.9.0). Runs the full CI (ci.yml), builds the macOS app, and publishes a
+# GitHub release with:
+#   photon-<version>-macos.zip                     universal photon.app (arm64 + x86_64) with its own glslang / spirv-cross
+#   photon2_<version>-1~ubuntu24.04_<arch>.deb     Ubuntu 24.04+
+#   photon2_<version>-1~deb12_<arch>.deb           Debian 12
+#   photon2-<version>-1.<arch>.rpm                 Fedora 40+
+#   photon2-<version>-<arch>.tar.gz                relocatable /usr tree
+#   photon2-<version>-<arch>.AppImage              any glibc 2.36+ distribution
+#   photon2-<arch>.flatpak                         Flatpak bundle (GNOME 51 runtime)
+#   SHA256SUMS
+# for x86_64 and aarch64. Nothing from Wallpaper Engine is built in or attached.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  macos-app:
+    name: macOS app (universal)
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Build tools
+        run: brew install ninja
+      # Static universal glslangValidator and spirv-cross (same versions as the Flatpak), cached by the script.
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/shader-tools
+          key: shader-tools-${{ hashFiles('scripts/macos/shader-tools.sh') }}
+      - name: Shader tools
+        run: |
+          [ -x "$RUNNER_TEMP/shader-tools/spirv-cross" ] || scripts/macos/shader-tools.sh "$RUNNER_TEMP/shader-tools" "$RUNNER_TEMP/shader-tools-src"
+      - name: photon.app
+        run: |
+          PHOTON_UNIVERSAL=1 PHOTON_HELPERS="$RUNNER_TEMP/shader-tools" scripts/macos/bundle.sh "$VERSION" "$RUNNER_TEMP/dist"
+          app="$RUNNER_TEMP/dist/photon.app"
+          lipo -info "$app/Contents/MacOS/photon"
+          "$app/Contents/MacOS/photon" --version | grep -qx "photon $VERSION"
+          codesign -v --deep "$app"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/dist/photon-$VERSION-macos.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-macos
+          path: ${{ runner.temp }}/dist/photon-*-macos.zip
+          if-no-files-found: error
+
+  publish:
+    name: GitHub release
+    needs: [ci, macos-app]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Collect the release files
+        run: |
+          out=$RUNNER_TEMP/release; mkdir -p "$out"
+          # Packages only: test logs, renders and screenshots in the same artifacts stay out.
+          find "$RUNNER_TEMP/artifacts" -type f \( -name '*.deb' -o -name '*.rpm' -o -name 'photon2-*.tar.gz' \
+              -o -name '*.AppImage' -o -name '*.flatpak' -o -name 'photon-*-macos.zip' \) \
+              -not -path '*pkg-test*' -not -path '*/test-*' | while read -r f; do
+            [ -e "$out/$(basename "$f")" ] || cp "$f" "$out/"
+          done
+          cd "$out" && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+          for want in macos.zip ubuntu24.04_amd64.deb ubuntu24.04_arm64.deb deb12_amd64.deb deb12_arm64.deb x86_64.rpm aarch64.rpm \
+                      x86_64.AppImage aarch64.AppImage x86_64.flatpak aarch64.flatpak; do
+            set -- *"$want"
+            [ -e "$1" ] || { echo "missing: *$want"; exit 1; }
+          done
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/release/* --title "photon ${GITHUB_REF_NAME#v}" \
+            --notes-file .github/release-notes.md --generate-notes --verify-tag

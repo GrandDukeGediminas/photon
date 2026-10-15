@@ -112,7 +112,7 @@ public final class ShaderCompiler {
         return CompiledStage(msl: msl, entryPoint: "main0", reflection: refl)
     }
 
-    /// Homebrew's path on macOS (as before); on Linux the env override, the distro path, /usr/local, or the copy a
+    /// macOS: the env override, the copy inside a release photon.app, then Homebrew's. Linux: the env override, the distro path, /usr/local, or the copy a
     /// package carries next to its private libraries (`<exe>/../lib/photon2/`, docs/linux-port.md §6.2: Fedora has no
     /// spirv-cross package).
     public static func defaultTool(_ name: String, env: String) -> String {
@@ -123,6 +123,11 @@ public final class ShaderCompiler {
         where FileManager.default.isExecutableFile(atPath: p) { return p }
         return "/usr/bin/" + name
         #else
+        if let p = ProcessInfo.processInfo.environment[env] { return p }
+        // A release photon.app carries its own static builds (scripts/macos/shader-tools.sh) in Contents/Helpers.
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/" + name).path
+        for p in [bundled, "/opt/homebrew/bin/" + name, "/usr/local/bin/" + name]
+        where FileManager.default.isExecutableFile(atPath: p) { return p }
         return "/opt/homebrew/bin/" + name
         #endif
     }
