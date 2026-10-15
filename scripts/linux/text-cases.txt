@@ -1,0 +1,19 @@
+# Text shaping cases for scripts/linux/ci.sh (docs/linux-port.md §3.3): font|size|text. A font ending in .ttf/.otf is a
+# file in the engine assets fonts/ directory, anything else a PostScript name. Each line is laid out by CoreText
+# (photon-tool text-shape, macOS) and by the Linux stand-in (photon-linux text-shape); the output must be identical.
+# Only fonts both systems have (or a metric-compatible substitute: ArialMT = Arimo, Menlo = DejaVu Sans Mono) and
+# characters those fonts cover: fallback fonts differ by platform (PingFang vs Noto CJK, Apple Color Emoji vs Noto).
+NotoSans-Regular.ttf|40|office AVATAR fi ffl Wa To.
+NotoSans-Regular.ttf|23|Téléphone ŝ́ — “quotes” 1/2
+NotoSans-Regular.ttf|31|Привет мир Ελληνικά
+RobotoMono-Regular.ttf|30|=> != -> www fi 0O
+Atami-Regular.otf|50|Hello World AV fi
+Lazer84.ttf|44|SYNTHWAVE 1984 AWAY
+8bitOperatorPlus8-Regular.ttf|16|Score: 12345 Lives AVA
+Monofur-PK7og.ttf|28|fifl <= >= :: ->
+Alcubierre.otf|36|WAVE Toyota fi
+summer85.ttf|40|Summer Vibes AWAY
+Segment7Standard.otf|48|12:45:07 88.8
+ArialMT|28|Wallpaper AVAVA Tokyo 12:45 fi
+ArialMT|13|Wednesday, 14 October 2026 - Café Ångström
+Menlo-Regular|24|for i in 0..<10 { x += 1 }

@@ -1,0 +1,15 @@
+{
+	"camera": {"center": "0 0 -1", "eye": "0 0 0", "up": "0 1 0"},
+	"general": {
+		"bloom": false,
+		"clearcolor": "0.05 0.05 0.08",
+		"orthogonalprojection": {"width": 1280, "height": 720}
+	},
+	"objects": [
+		{"id": 1, "name": "background", "image": "models/gradient.json", "origin": "640 360 0", "scale": "5 5 1", "angles": "0 0 0", "size": "256 144"},
+		{"id": 2, "name": "checker", "image": "models/checker.json", "origin": "360 380 0", "scale": "2 2 1", "angles": "0 0 0.4", "size": "128 128"},
+		{"id": 3, "name": "disc", "image": "models/disc.json", "origin": "880 320 0", "scale": "2.5 2.5 1", "angles": "0 0 0", "size": "128 128"},
+		{"id": 4, "name": "ring half alpha", "image": "models/ring.json", "origin": "760 420 0", "scale": "3 1.5 1", "angles": "0 0 -0.3", "size": "128 128", "alpha": 0.6},
+		{"id": 5, "name": "tinted checker", "image": "models/checker.json", "origin": "1100 560 0", "scale": "1 1 1", "angles": "0 0 0.785", "size": "128 128", "color": "1 0.5 0.5", "brightness": 1.3}
+	]
+}

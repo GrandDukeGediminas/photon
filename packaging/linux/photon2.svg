@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- photon2 app icon: a desktop with a wallpaper scene (sky, sun, hills) and a light ray. CC0. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d2a8c"/>
+      <stop offset="0.55" stop-color="#b7409a"/>
+      <stop offset="1" stop-color="#f08a4b"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6c2"/>
+      <stop offset="0.6" stop-color="#ffd24a"/>
+      <stop offset="1" stop-color="#ff9f2e"/>
+    </radialGradient>
+    <clipPath id="screen"><rect x="24" y="36" width="208" height="148" rx="10"/></clipPath>
+  </defs>
+  <rect x="16" y="28" width="224" height="164" rx="18" fill="#22252b"/>
+  <g clip-path="url(#screen)">
+    <rect x="24" y="36" width="208" height="148" fill="url(#sky)"/>
+    <circle cx="160" cy="118" r="40" fill="url(#sun)"/>
+    <path d="M24 150 C70 120 110 140 150 150 S210 135 232 145 V184 H24 Z" fill="#2b6e6a"/>
+    <path d="M24 166 C80 146 140 170 232 158 V184 H24 Z" fill="#1d4a52"/>
+    <path d="M44 56 L118 112" stroke="#ffffff" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="44" cy="56" r="9" fill="#ffffff"/>
+  </g>
+  <rect x="104" y="192" width="48" height="22" fill="#22252b"/>
+  <rect x="76" y="212" width="104" height="14" rx="7" fill="#22252b"/>
+</svg>

@@ -1,0 +1,6 @@
+{"file": "index.html", "title": "photon2 web API test", "type": "web",
+ "general": {"supportsaudioprocessing": true, "properties": {
+  "speed": {"type": "slider", "value": 42, "min": 0, "max": 100, "text": "Speed", "order": 1},
+  "folder": {"type": "directory", "mode": "fetchall", "value": "", "text": "Folder", "order": 2},
+  "lazy": {"type": "directory", "mode": "ondemand", "value": "", "text": "Lazy", "order": 3},
+  "tint": {"type": "color", "value": "0.5 0.25 1", "text": "Tint", "order": 4}}}}

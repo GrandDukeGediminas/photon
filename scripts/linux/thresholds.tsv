@@ -1,0 +1,30 @@
+# Per-wallpaper limits for the macOS (Metal, Apple GPU) vs Linux (Vulkan, lavapipe) comparison of the test set
+# (scripts/linux/pixeldiff.py --thresholds; docs/linux-port.md §7). 1280×720 at t = 2 s, PHOTON_SEED=1, macOS reference
+# rendered right before the Linux frame, lavapipe with GALLIVM_PERF=no_aos_sampling (the image's default, §7).
+# Columns: id, max mean absolute per-channel difference (0..255), max pixels whose largest channel difference is > 32.
+# Set from the phase-4 table (2026-10-14 `ci.sh --mac --native-gs --x11 --audio`): mean × 1.25 + 0.05 and pixels × 1.5 + 20,
+# so lavapipe/Mesa or font updates fit and a real regression (a pass missing, a wrong blend, shifted geometry) does not.
+# The two text-heavy scenes show seconds, frames per second and a random kaomoji, so their limits also add what two macOS
+# renders of the same scene differ by (3351163962: mean 0.049, 1,210 px; 2902406982: mean 0.128, 709 px).
+2541606883	0.53	20
+1355236618	0.26	24
+1442092399	0.05	20
+1275921440	0.08	20
+1975950854	0.33	20
+2122598327	0.47	20
+1425503532	0.34	21
+3463520581	0.58	20
+3509243656	0.08	353
+3047405322	0.23	93
+2067939514	2.06	651
+2927802976	0.26	20
+1315534440	0.12	29
+3642408184	0.94	20
+3611879823	0.56	20
+2903412088	0.74	75
+3147346398	0.46	20
+3288381550	0.81	33
+3351163962	0.38	2607
+2902406982	0.76	1467
+gif-1444077782	0.05	20
+gif-2504353624	0.05	20

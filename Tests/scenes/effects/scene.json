@@ -1,0 +1,15 @@
+{
+	"camera": {"center": "0 0 -1", "eye": "0 0 0", "up": "0 1 0"},
+	"general": {"bloom": false, "clearcolor": "0 0 0", "orthogonalprojection": {"width": 1280, "height": 720}},
+	"objects": [
+		{"id": 1, "name": "stripes + wave", "image": "models/stripes.json", "origin": "640 360 0", "scale": "5 5 1", "angles": "0 0 0", "size": "256 144",
+		 "effects": [{"id": 10, "file": "effects/cc0wave/effect.json", "passes": [{"constantshadervalues": {"strength": 0.04, "frequency": 3}}]}]},
+		{"id": 2, "name": "checker + wave + tint", "image": "models/checker.json", "origin": "420 360 0", "scale": "2.5 2.5 1", "angles": "0 0 0.2", "size": "128 128",
+		 "effects": [
+			{"id": 11, "file": "effects/cc0wave/effect.json", "passes": [{"constantshadervalues": {"strength": 0.06, "frequency": 2}}]},
+			{"id": 12, "file": "effects/cc0tint/effect.json", "passes": [{"constantshadervalues": {"color": "0.2 1 0.4", "amount": 0.7}}]}
+		 ]},
+		{"id": 3, "name": "checker + tint", "image": "models/checker.json", "origin": "900 360 0", "scale": "2 2 1", "angles": "0 0 0", "size": "128 128",
+		 "effects": [{"id": 13, "file": "effects/cc0tint/effect.json", "passes": [{"constantshadervalues": {"color": "1 0.3 0.8", "amount": 0.9}}]}]}
+	]
+}

@@ -1,0 +1,1 @@
+{"passes": [{"shader": "effects/cc0tint", "blending": "normal", "cullmode": "nocull", "depthtest": "disabled", "depthwrite": "disabled", "textures": [null]}]}

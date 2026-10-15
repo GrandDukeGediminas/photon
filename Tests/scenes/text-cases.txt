@@ -1,0 +1,7 @@
+# Text shaping cases in the committed font (Tests/scenes/text/fonts), for CI without the engine's fonts: font|size|text,
+# laid out by CoreText (photon-tool text-shape) and by the Linux stand-in (photon-linux text-shape). Reference:
+# text-coretext.txt. Checked by scripts/linux/ci-hosted.sh together with the system-font cases of scripts/linux/text-cases.txt.
+NotoMono-Regular.ttf|22|photon2 test scene
+NotoMono-Regular.ttf|13|AVATAR office fi fl
+NotoMono-Regular.ttf|30|Kerning: To. Wa Yo 0123456789 !?&%
+NotoMono-Regular.ttf|17|Téléphone — “quotes” 1/2 café

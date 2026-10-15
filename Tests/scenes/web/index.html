@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- CC0 1.0: photon2 synthetic test wallpaper (Tests/scenes/LICENSE). Deterministic: no clock, no randomness. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2238; font: 20px sans-serif; color: #fff; }
+  #grad { position: absolute; left: 5%; top: 10%; width: 40%; height: 40%; background: linear-gradient(90deg, #3050d0, #d03080); }
+  #disc { position: absolute; left: 55%; top: 15%; width: 25vh; height: 25vh; border-radius: 50%; background: #f0c020; }
+  canvas { position: absolute; left: 5%; bottom: 8%; width: 90%; height: 30%; }
+  #log { position: absolute; right: 2%; bottom: 2%; font-size: 12px; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="grad"></div>
+<div id="disc"></div>
+<canvas id="c" width="800" height="200"></canvas>
+<pre id="log"></pre>
+<script>
+  var state = { accent: [1, 0.5, 0], bars: 6, caption: "hello" };
+  var lines = [];
+  function log(s) { lines.push(s); document.getElementById("log").textContent = lines.join("\n"); }
+  function draw() {
+    var c = document.getElementById("c"), g = c.getContext("2d");
+    g.clearRect(0, 0, c.width, c.height);
+    var w = c.width / state.bars;
+    for (var i = 0; i < state.bars; i++) {
+      var k = (i + 1) / state.bars;
+      g.fillStyle = "rgb(" + Math.round(state.accent[0] * 255 * k) + "," + Math.round(state.accent[1] * 255 * k) + "," +
+        Math.round(state.accent[2] * 255 * k) + ")";
+      g.fillRect(i * w + 4, c.height * (1 - k), w - 8, c.height * k);
+    }
+  }
+  window.wallpaperPropertyListener = {
+    applyUserProperties: function (p) {
+      if (p.accent) { state.accent = p.accent.value.split(" ").map(Number); log("accent=" + p.accent.value); }
+      if (p.bars) { state.bars = Math.round(p.bars.value); log("bars=" + state.bars); }
+      if (p.caption) { state.caption = p.caption.value; log("caption=" + state.caption); }
+      draw();
+    },
+    applyGeneralProperties: function (p) { if (p.fps !== undefined) log("fps=" + p.fps); }
+  };
+  draw();
+  log("loaded");
+</script>
+</body>
+</html>

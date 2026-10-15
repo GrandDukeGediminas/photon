@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=photon
+Comment=Wallpaper Engine wallpapers on the desktop (status icon, no window)
+Exec=photon-linux app --background
+Icon=photon2
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-phase=2

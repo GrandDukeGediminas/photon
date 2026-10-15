@@ -1,0 +1,10 @@
+module CX11 [system] {
+    header "shim.h"
+    link "X11"
+    link "Xrandr"
+    link "Xext"
+    link "Xss"
+    link "Xi"
+    link "Xtst"
+    export *
+}

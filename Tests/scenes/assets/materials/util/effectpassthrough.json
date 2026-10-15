@@ -1,0 +1,1 @@
+{"passes": [{"shader": "cc0_image", "blending": "normal", "depthtest": "disabled", "depthwrite": "disabled", "cullmode": "nocull"}]}

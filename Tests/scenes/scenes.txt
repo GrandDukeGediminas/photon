@@ -1,0 +1,7 @@
+# Synthetic CC0 test scenes (Tests/scenes/README.md). id  feature
+images       several image layers: alpha, scale, rotation, translucent blending
+effects      image layers with custom effect passes (time-driven wave displacement, tint), chained effects
+particles    two particle systems: box / sphere emitters, random initializers, gravity, drag, fades, size change
+text         text layers in a committed OFL font: alignment, multi-line, colour, opaque background with padding
+perspective  perspective camera, two lit MDL meshes (cube, torus), depth test, back-face culling
+web          web wallpaper (WebKitGTK on Linux): CSS gradient, canvas bars driven by user properties

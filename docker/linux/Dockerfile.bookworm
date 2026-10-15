@@ -1,0 +1,35 @@
+# Package build image for Debian 12 (docs/linux-port.md §6.2): scripts/linux/package.sh --distro debian12.
+# A binary linked on Ubuntu 24.04 needs glibc 2.38 (strlcpy, fmod, the C23 strtol family) and the t64 library package
+# names, so it cannot install on Debian 12 (glibc 2.36); the Debian package is built here instead. Only what the build
+# and the package step need: the Swift toolchain, the -dev packages photon-linux links, OpenAL Soft 1.21.1 from source
+# with the same patch as docker/linux/Dockerfile (bundled into the package) and its default HRTF set for sound-check,
+# rsvg-convert and desktop-file-validate, and numpy + PIL for the render comparison of the install test.
+#   docker build -t photon2-linux:bookworm -f docker/linux/Dockerfile.bookworm docker/linux
+ARG SWIFT_IMAGE=swift:6.2-bookworm
+FROM ${SWIFT_IMAGE}
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libvulkan-dev glslang-tools spirv-cross \
+        libpng-dev libturbojpeg0-dev liblz4-dev zlib1g-dev libfreetype-dev libfontconfig-dev \
+        libjavascriptcoregtk-4.1-dev libx11-dev libxrandr-dev libxext-dev libxss-dev \
+        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libharfbuzz-dev libstb-dev \
+        libpulse-dev libasound2-dev libpipewire-0.3-dev libglib2.0-dev \
+        libwayland-dev libwayland-bin wayland-protocols libwebkit2gtk-4.1-dev libgtk-layer-shell-dev \
+        cmake g++ make curl ca-certificates pkg-config file binutils \
+        librsvg2-bin desktop-file-utils imagemagick python3 python3-numpy python3-pil \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG OPENAL_VERSION=1.21.1
+RUN curl -fsSL https://github.com/kcat/openal-soft/archive/refs/tags/${OPENAL_VERSION}.tar.gz -o /tmp/openal.tar.gz \
+    && mkdir /tmp/openal && tar -xzf /tmp/openal.tar.gz -C /tmp/openal --strip-components=1 \
+    && sed -i '/^inline int fastf2i/,/^}/ s/return static_cast<int>(f);/return static_cast<int>(__builtin_lrintf(f));/' \
+        /tmp/openal/common/alnumeric.h \
+    && grep -q "__builtin_lrintf(f)" /tmp/openal/common/alnumeric.h \
+    && cmake -S /tmp/openal -B /tmp/openal/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_TESTS=OFF -DALSOFT_REQUIRE_PULSEAUDIO=ON \
+        -DALSOFT_EMBED_HRTF_DATA=ON \
+    && cmake --build /tmp/openal/build -j"$(nproc)" && cmake --install /tmp/openal/build \
+    && mkdir -p /usr/local/share/openal && cp "/tmp/openal/hrtf/Default HRTF.mhr" /usr/local/share/openal/default-hrtf-1.21.1.mhr \
+    && ldconfig && rm -rf /tmp/openal /tmp/openal.tar.gz
+
+WORKDIR /src

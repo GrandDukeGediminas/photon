@@ -1,0 +1,1 @@
+{"passes": [{"shader": "cc0_image", "blending": "translucent", "cullmode": "nocull", "depthtest": "disabled", "depthwrite": "disabled", "textures": ["ring"]}]}

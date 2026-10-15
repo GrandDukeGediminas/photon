@@ -1,0 +1,29 @@
+# The Linux test set (docs/linux-port.md §7): Steam workshop ids, one per line; gif-<id> is a GIF wallpaper built from
+# workshop item <id>'s preview.gif (env.sh prepare_gifs; the corpus has no GIF wallpapers).
+# Scenes (phase 1-2 set)
+2541606883
+1355236618
+1442092399
+1275921440
+1975950854
+2122598327
+1425503532
+3463520581
+3509243656
+3047405322
+2067939514
+2927802976
+1315534440
+# Video wallpapers (GStreamer; the engine's videoplayer scene with `videotex`): 3840x2160 60 fps, 1920x1080 30 fps + AAC
+3642408184
+3611879823
+# Video textures in scenes (flag-0x20 .tex): 3840x2160 25 fps + 2 text layers, 3840x2160 30 fps, 4090x2300 60 fps
+2903412088
+3147346398
+3288381550
+# Text-heavy scenes: 34 text layers (CJK, kaomoji, systemfont_comicsans), 97 text layers (CJK, seconds, FPS)
+3351163962
+2902406982
+# GIF wallpapers (stb_image): 65 frames with 10 ms delays (the 0.1 s rule), 28 frames with restore-to-background
+gif-1444077782
+gif-2504353624

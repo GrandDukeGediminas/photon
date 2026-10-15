@@ -1,0 +1,5 @@
+module CWaylandClient [system] {
+    header "shim.h"
+    link "wayland-client"
+    export *
+}

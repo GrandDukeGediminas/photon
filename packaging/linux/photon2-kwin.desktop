@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=photon desktop host
+Comment=Lets KWin give photon's desktop host the window list for its playback rules
+Exec=/usr/bin/photon-linux desktop
+Icon=photon2
+Terminal=false
+NoDisplay=true
+X-KDE-Wayland-Interfaces=org_kde_plasma_window_management

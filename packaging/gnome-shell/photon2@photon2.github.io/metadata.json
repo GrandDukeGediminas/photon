@@ -1,0 +1,8 @@
+{
+  "uuid": "photon2@photon2.github.io",
+  "name": "photon2 Live Wallpaper",
+  "description": "Shows photon2's animated wallpapers (Wallpaper Engine scenes and videos rendered by photon-linux) as the desktop background, and reports window states to photon2 for its playback rules (pause when a window is fullscreen, maximized or focused).",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "session-modes": ["user", "unlock-dialog"],
+  "version": 1
+}

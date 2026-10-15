@@ -1,0 +1,23 @@
+# systemd user unit for the photon app (docs/linux-port.md §6.2). Starts with the graphical session and stops with it:
+#   systemctl --user enable --now photon2.service
+# The session must export DISPLAY / WAYLAND_DISPLAY to the user manager (GNOME, KDE and most display managers do;
+# sway/Hyprland users add `exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP` and
+# `exec systemctl --user start graphical-session.target` or use their session's systemd integration).
+[Unit]
+Description=photon: Wallpaper Engine wallpapers on the desktop
+Documentation=file:///usr/share/doc/photon2/linux-port.md
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/photon-linux app --background
+# The desktop hosts are children of the app (one per group of displays); they end with it.
+KillMode=control-group
+Restart=on-failure
+RestartSec=5
+Slice=app-graphical.slice
+
+[Install]
+WantedBy=graphical-session.target

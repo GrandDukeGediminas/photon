@@ -1,0 +1,13 @@
+{
+	"material": "materials/particle/spark.json",
+	"maxcount": 200,
+	"starttime": 5,
+	"emitter": [{"name": "sphererandom", "rate": 30, "origin": "0 0 0", "directions": "1 1 0", "distancemin": 10, "distancemax": 300}],
+	"initializer": [
+		{"name": "lifetimerandom", "min": 3, "max": 5},
+		{"name": "sizerandom", "min": 30, "max": 70},
+		{"name": "velocityrandom", "min": "-30 -30 0", "max": "30 30 0"},
+		{"name": "colorrandom", "min": "80 160 255", "max": "160 220 255"}
+	],
+	"operator": [{"name": "movement", "gravity": "0 0 0"}, {"name": "alphafade", "fadeintime": 0.5, "fadeouttime": 0.5}]
+}

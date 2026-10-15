@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.photon2.Photon</id>
+  <name>photon</name>
+  <summary>Wallpaper Engine wallpapers on the Linux desktop</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>photon draws Wallpaper Engine scene, video and web wallpapers behind the desktop on X11 and on Wayland
+    compositors with layer-shell, from the user's own Wallpaper Engine install and Steam Workshop items. A status icon
+    opens the wallpaper browser, properties, playlists and settings.</p>
+  </description>
+  <launchable type="desktop-id">io.github.photon2.Photon.desktop</launchable>
+  <categories><category>Utility</category></categories>
+  <content_rating type="oars-1.1"/>
+</component>

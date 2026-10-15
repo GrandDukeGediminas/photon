@@ -1,0 +1,5 @@
+module COpenAL [system] {
+    header "shim.h"
+    link "openal"
+    export *
+}

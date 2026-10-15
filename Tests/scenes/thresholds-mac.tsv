@@ -1,0 +1,10 @@
+# Limits for the synthetic CC0 scenes on macOS (scripts/linux/scenes-check.sh --mac and the macOS CI job): photon-tool
+# renders against Tests/scenes/refs-mac (Metal on an Apple GPU), 640x360, t = 2 s, PHOTON_SEED=1. Columns: id, max mean
+# absolute per-channel difference, max pixels whose largest channel difference is > 32. Two renders on one Mac are
+# byte-identical; another GPU generation (or the hosted runner's paravirtual GPU) may round differently, so the limits
+# are the Metal-vs-lavapipe envelope (thresholds.tsv) rather than exact equality.
+images       0.106   20
+effects      0.080   20
+particles    0.124   20
+text         0.198   22
+perspective  0.200   316

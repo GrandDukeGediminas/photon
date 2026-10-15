@@ -1,0 +1,8 @@
+module CPhotonLinux [system] {
+    header "shim.h"
+    link "png16"
+    link "turbojpeg"
+    link "lz4"
+    link "stb"
+    export *
+}

@@ -1,0 +1,49 @@
+# Build output
+.build/
+.swiftpm/
+/dist/
+/out/
+*.app/
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+*.flatpak
+*.o
+*.a
+*.so
+*.dylib
+
+# Engine binaries, reverse-engineering notes and decompiled evidence stay local: only the clean-room code is published
+vendor/
+docs/re/
+*.exe
+*.dll
+*.hop
+*.hop.*
+
+# Wallpaper Engine content: workshop items, packages and media never belong in the repo
+431960/
+*.pkg
+*.mp4
+*.webm
+*.mkv
+*.mov
+*.avi
+*.wmv
+*.m4v
+project.json.bak
+
+# Python, editors, OS
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+xcuserdata/
+*.xcodeproj/
+*.xcworkspace/
+*.ips
+.env

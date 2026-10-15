@@ -1,0 +1,14 @@
+{
+	"camera": {"center": "0 0 -1", "eye": "0 0 0", "up": "0 1 0"},
+	"general": {"bloom": false, "clearcolor": "0 0 0", "orthogonalprojection": {"width": 1280, "height": 720}},
+	"objects": [
+		{"id": 1, "name": "background", "image": "models/gradient.json", "origin": "640 360 0", "scale": "10 10 1", "angles": "0 0 0", "size": "128 72"},
+		{"id": 2, "name": "title", "text": {"value": "photon2 test scene"}, "font": "fonts/NotoMono-Regular.ttf", "pointsize": 22,
+		 "origin": "640 520 0", "scale": "1 1 1", "angles": "0 0 0", "color": "1 1 1", "horizontalalign": "center", "verticalalign": "center"},
+		{"id": 3, "name": "body", "text": {"value": "AVATAR office fi fl\nKerning: To. Wa Yo\n0123456789 !?&%"}, "font": "fonts/NotoMono-Regular.ttf", "pointsize": 13,
+		 "origin": "640 340 0", "scale": "1 1 1", "angles": "0 0 0", "color": "1 0.9 0.3", "horizontalalign": "center", "verticalalign": "center"},
+		{"id": 4, "name": "boxed", "text": {"value": "left aligned, boxed"}, "font": "fonts/NotoMono-Regular.ttf", "pointsize": 10,
+		 "origin": "60 120 0", "scale": "1 1 1", "angles": "0 0 0.1", "color": "0.2 0.2 0.3", "horizontalalign": "left", "verticalalign": "center",
+		 "opaquebackground": true, "backgroundcolor": "0.9 0.9 1", "padding": "16 8"}
+	]
+}

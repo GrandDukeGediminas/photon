@@ -1,0 +1,217 @@
+# photon2 CI on GitHub-hosted runners (docs/linux-port.md §7). Nothing here needs the Steam Workshop corpus, a Wallpaper
+# Engine install or a secret: the Linux jobs render the CC0 scenes in Tests/scenes; the full corpus comparison stays
+# local (scripts/linux/ci.sh). Every Linux job runs on x86_64 (ubuntu-24.04) and arm64 (ubuntu-24.04-arm).
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS build and tests
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tools
+        run: |
+          brew install glslang spirv-cross
+          swift --version
+      - name: swift build (debug)
+        run: swift build
+      - name: swift build (release)
+        run: swift build -c release
+      - name: swift test
+        run: swift test
+      # Metal renders of the synthetic scenes against Tests/scenes/refs-mac. Hosted macOS runners are VMs with a
+      # paravirtual GPU, so this step reports but does not gate.
+      - name: Synthetic scenes (Metal)
+        continue-on-error: true
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet numpy pillow
+          out=$RUNNER_TEMP/scenes-mac; mkdir -p "$out"
+          grep -v '^#' Tests/scenes/scenes.txt | awk 'NF && $1 != "web" {print $1}' > "$out/ids.txt"
+          while read -r id; do
+            PHOTON_SEED=1 PHOTON_WE_ASSETS=$PWD/Tests/scenes/assets .build/release/photon-tool render \
+              "$PWD/Tests/scenes/$id" "$out/mac_$id.png" 2 640 360
+          done < "$out/ids.txt"
+          "$RUNNER_TEMP/venv/bin/python" scripts/linux/pixeldiff.py Tests/scenes/refs-mac "$out" --ids "$out/ids.txt" \
+            --prefix mac_ --thresholds Tests/scenes/thresholds-mac.tsv | tee "$out/diff-mac.md"
+      - name: Upload macOS scene renders
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scenes-mac
+          path: ${{ runner.temp }}/scenes-mac
+          if-no-files-found: ignore
+
+  # The static photon-linux the packages ship is built once and is also the binary the hosted checks run.
+  linux:
+    name: Linux ${{ matrix.arch }} (Docker, lavapipe)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    env:
+      PHOTON_LX_IMAGE: photon2-linux:dev
+    steps:
+      - uses: actions/checkout@v7
+      # Scratch directories for scripts/linux/env.sh. No corpus and no engine install on a hosted runner: empty
+      # directories keep the container mounts valid.
+      - name: Paths
+        run: |
+          {
+            echo "PHOTON_LX_BUILD=$RUNNER_TEMP/lx-build"
+            echo "PHOTON_LX_CACHE=$RUNNER_TEMP/lx-cache"
+            echo "PHOTON_LX_OUT=$RUNNER_TEMP/lx-out"
+            echo "PHOTON_WS=$RUNNER_TEMP/no-workshop"
+            echo "PHOTON_WE=$RUNNER_TEMP/no-engine/assets"
+          } >> "$GITHUB_ENV"
+      # The image is about 7 GB and the Swift build adds about 3 GB; the runner starts with about 14 GB free.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image (cached)
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/linux
+          tags: photon2-linux:dev
+          load: true
+          cache-from: type=gha,scope=photon2-linux-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=photon2-linux-${{ matrix.arch }}
+      - name: SPIR-V cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/lx-cache
+          key: lx-cache-${{ matrix.arch }}-${{ hashFiles('Tests/scenes/assets/shaders/**', 'Tests/scenes/*/shaders/**') }}
+          restore-keys: lx-cache-${{ matrix.arch }}-
+      # .deb (Ubuntu 24.04), .rpm (Fedora 40+) and tarball; static Swift runtime, OpenAL Soft 1.21.1 private.
+      - name: Build photon-linux (static) and the packages
+        run: scripts/linux/package.sh --no-test
+      # info, self-tests, text shaping against CoreText, the CC0 scenes (byte-identical to Tests/scenes/refs/<arch>
+      # when the image's Mesa is the one the references were made with), the GTK app under Xvfb and sway.
+      - name: Hosted checks (the packaged binary)
+        run: PHOTON_LX_BUILD=$RUNNER_TEMP/lx-build/static scripts/linux/ci-hosted.sh release --no-build
+      # Fresh ubuntu:24.04 and fedora:40 containers: apt / dnf install, dpkg -i / rpm -i, ldd, info, self-test,
+      # sound-check against the bundled OpenAL, the CC0 scenes.
+      - name: Install tests
+        run: scripts/linux/package.sh --test-only
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-out-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/lx-out/scenes
+            ${{ runner.temp }}/lx-out/text-hosted
+            ${{ runner.temp }}/lx-out/app
+            ${{ runner.temp }}/lx-out/pkg-test
+            ${{ runner.temp }}/lx-build/static.log
+          if-no-files-found: ignore
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-packages-${{ matrix.arch }}
+          path: ${{ runner.temp }}/lx-out/pkg
+          if-no-files-found: error
+
+  # Debian 12 has glibc 2.36 and the pre-t64 package names: its .deb is built in docker/linux/Dockerfile.bookworm.
+  debian12:
+    name: Debian 12 package and AppImage ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Paths
+        run: |
+          {
+            echo "PHOTON_LX_BUILD=$RUNNER_TEMP/lx-build"
+            echo "PHOTON_LX_CACHE=$RUNNER_TEMP/lx-cache"
+            echo "PHOTON_LX_OUT=$RUNNER_TEMP/lx-out"
+            echo "PHOTON_WS=$RUNNER_TEMP/no-workshop"
+            echo "PHOTON_WE=$RUNNER_TEMP/no-engine/assets"
+          } >> "$GITHUB_ENV"
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image (cached)
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/linux
+          file: docker/linux/Dockerfile.bookworm
+          tags: photon2-linux:bookworm
+          load: true
+          cache-from: type=gha,scope=photon2-bookworm-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=photon2-bookworm-${{ matrix.arch }}
+      - name: Build, package, install in debian:12
+        run: scripts/linux/package.sh --distro debian12
+      # The AppImage is made from the Debian 12 build (glibc 2.36) and run in fresh ubuntu:24.04 and fedora:40,
+      # including a web wallpaper through the bundled WebKitGTK.
+      - name: AppImage
+        run: scripts/linux/appimage.sh
+      - name: Upload package and AppImage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: debian12-appimage-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/lx-out/pkg
+            ${{ runner.temp }}/lx-out/pkg-test
+            ${{ runner.temp }}/lx-out/appimage
+          if-no-files-found: ignore
+
+  flatpak:
+    name: Flatpak ${{ matrix.arch }} (GNOME 51)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: photon2-${{ matrix.arch }}.flatpak
+          manifest-path: packaging/flatpak/io.github.photon2.Photon.yml
+          arch: ${{ matrix.arch }}
+          cache-key: flatpak-builder-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/io.github.photon2.Photon.yml') }}
+      # The action leaves the app in its repo; install the bundle it wrote and run it under bubblewrap.
+      - name: Run the Flatpak headlessly
+        run: |
+          flatpak install --user -y --noninteractive --reinstall "photon2-${{ matrix.arch }}.flatpak"
+          sh scripts/linux/in-container/flatpak-check.sh . "$RUNNER_TEMP/flatpak-check" --user
+      - name: Upload check output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: flatpak-check-${{ matrix.arch }}
+          path: ${{ runner.temp }}/flatpak-check
+          if-no-files-found: ignore

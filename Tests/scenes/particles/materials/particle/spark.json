@@ -1,0 +1,1 @@
+{"passes": [{"shader": "cc0_particle", "blending": "additive", "cullmode": "nocull", "depthtest": "disabled", "depthwrite": "disabled", "textures": ["spark"], "constantshadervalues": {"overbright": 1.5}}]}

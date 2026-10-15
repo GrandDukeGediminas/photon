@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=photon
+GenericName=Animated Wallpapers
+Comment=Wallpaper Engine scenes, videos and web wallpapers on the desktop
+Exec=photon-linux app %u
+TryExec=photon-linux
+Icon=photon2
+Terminal=false
+Categories=Utility;GTK;
+Keywords=wallpaper;Wallpaper Engine;background;desktop;animated;
+StartupWMClass=photon2
+StartupNotify=false
+SingleMainWindow=true

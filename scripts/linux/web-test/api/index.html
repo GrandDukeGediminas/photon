@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- photon2 web wallpaper API test (scripts/linux/in-container/web-check.sh, docs/linux-port.md §5.3): logs what the
+     host delivers, to the console (PHOTON_WEBDEBUG=1) and to the page; the left half is #2040c0, the right #c04020. -->
+<html><head><style>body{margin:0;background:#c04020;color:#fff;font:16px monospace}
+#half{position:absolute;left:0;top:0;width:50%;height:100%;background:#2040c0}#log{position:absolute;left:52%;top:0;margin:0}</style></head>
+<body><div id="half"></div><pre id="log"></pre>
+<script>
+function log(s){console.log(s);document.getElementById('log').textContent+=s+'\n';}
+log('utils '+JSON.stringify(window.wallpaperGetUtilities&&window.wallpaperGetUtilities()));
+log('runtime '+(typeof window.___wpxShared)+' '+(typeof window.wallpaperMediaIntegration));
+window.wallpaperPluginListener={onPluginLoaded:function(n,v){log('plugin '+n+' '+JSON.stringify(v));
+  if(n==='cue'){cue.getDeviceCount(function(c){log('cue devices '+c);});}}};
+window.wallpaperPropertyListener={
+  applyUserProperties:function(p){
+    log('user speed '+JSON.stringify(p.speed)+' tint '+JSON.stringify(p.tint)+' folder '+(p.folder&&p.folder.type)+'/'+(p.folder&&p.folder.mode)+' keys '+Object.keys(p).join(','));
+    if(p.lazy) wallpaperRequestRandomFileForProperty('lazy',function(n,f){log('random '+n+' '+f.split('/').pop());
+      var i=new Image(); i.onload=function(){log('img ok '+i.width+'x'+i.height);}; i.onerror=function(){log('img FAIL '+f);}; i.src=f;});},
+  applyGeneralProperties:function(g){log('general '+Object.keys(g).sort().join(','));},
+  userDirectoryFilesAddedOrChanged:function(n,files){log('dir '+n+' '+files.map(function(f){return f.split('/').pop();}).join(','));},
+  setPaused:function(p){log('paused '+p);}
+};
+var calls=0, frames=0, peakL={}, peakR={};
+wallpaperRegisterAudioListener(function(a){calls+=100;});
+wallpaperRegisterAudioListener(function(a){
+  calls+=1; frames++;
+  if(!Array.isArray(a)||a.length!==128){log('bad frame '+(a&&a.length));return;}
+  var l=0,r=0; for(var i=1;i<64;i++){if(a[i]>a[l])l=i; if(a[64+i]>a[64+r])r=i;}
+  if(a[l]>0.01) peakL[l]=(peakL[l]||0)+1; if(a[64+r]>0.01) peakR[r]=(peakR[r]||0)+1;});
+wallpaperRegisterAudioListener(1,2);
+['Properties','Thumbnail','Playback','Timeline','Status'].forEach(function(k){
+  window['wallpaperRegisterMedia'+k+'Listener'](function(e){
+    if(k==='Thumbnail') log('media Thumbnail '+String(e.thumbnail).slice(0,22)+' '+e.primaryColor+' '+e.secondaryColor+' '+e.textColor);
+    else log('media '+k+' '+JSON.stringify(e).slice(0,160));});});
+function topBin(m){var b=-1,n=0;for(var k in m){if(m[k]>n){n=m[k];b=+k;}}return b;}
+window.photonAudioReport=function(){return 'audio calls '+calls+' frames '+frames+' peaks '+topBin(peakL)+' '+topBin(peakR);};
+setTimeout(function(){log('filter='+document.documentElement.style.filter+' transform='+document.documentElement.style.transform);},1500);
+log('registered');
+</script></body></html>

@@ -1,0 +1,9 @@
+{
+	"camera": {"center": "0 0 -1", "eye": "0 0 0", "up": "0 1 0"},
+	"general": {"bloom": false, "clearcolor": "0 0 0", "orthogonalprojection": {"width": 1280, "height": 720}},
+	"objects": [
+		{"id": 1, "name": "background", "image": "models/gradient.json", "origin": "640 360 0", "scale": "10 10 1", "angles": "0 0 0", "size": "128 72", "brightness": 0.4, "color": "0.4 0.4 0.4"},
+		{"id": 2, "name": "fountain", "particle": "particles/fountain.json", "origin": "400 120 0", "scale": "1 1 1", "angles": "0 0 0"},
+		{"id": 3, "name": "drift", "particle": "particles/drift.json", "origin": "940 400 0", "scale": "1 1 1", "angles": "0 0 0"}
+	]
+}

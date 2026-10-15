@@ -1,0 +1,117 @@
+{
+ "response": {
+  "result": 1,
+  "resultcount": 3,
+  "publishedfiledetails": [
+   {
+    "publishedfileid": "3819548334",
+    "result": 1,
+    "creator": "76561199093053261",
+    "creator_app_id": 431960,
+    "consumer_app_id": 431960,
+    "filename": "",
+    "file_size": "35644182",
+    "file_url": "",
+    "hcontent_file": "4717794689084925372",
+    "preview_url": "https://images.steamusercontent.com/ugc/18391981501184385461/0AA768B2E0F90DA3C5958152AE8FA15E67910357/",
+    "hcontent_preview": "18391981501184385461",
+    "title": "【明日方舟/Arknights】檐花穗影-黍shu",
+    "description": "画师：Sunlityang/Sun暖阳杨\n原画：https://x.com/Sunlityangai/status/2100360463053971627\n动效制作：agro（Vera_海月）\n背景音乐：The Wind Sings - G",
+    "time_created": 1791964100,
+    "time_updated": 1791964100,
+    "visibility": 0,
+    "banned": 0,
+    "ban_reason": "",
+    "subscriptions": 3036,
+    "favorited": 198,
+    "lifetime_subscriptions": 3676,
+    "lifetime_favorited": 204,
+    "views": 226,
+    "tags": [
+     {
+      "tag": "Scene"
+     },
+     {
+      "tag": "Anime"
+     },
+     {
+      "tag": "Wallpaper"
+     },
+     {
+      "tag": "Audio responsive"
+     },
+     {
+      "tag": "Video Texture"
+     },
+     {
+      "tag": "Customizable"
+     },
+     {
+      "tag": "3840 x 2160"
+     },
+     {
+      "tag": "Puppet Warp"
+     },
+     {
+      "tag": "Media Integration"
+     },
+     {
+      "tag": "Everyone"
+     }
+    ]
+   },
+   {
+    "publishedfileid": "3815542599",
+    "result": 1,
+    "creator": "76561198432377394",
+    "creator_app_id": 431960,
+    "consumer_app_id": 431960,
+    "filename": "",
+    "file_size": "134752600",
+    "file_url": "",
+    "hcontent_file": "2634236712795946329",
+    "preview_url": "https://images.steamusercontent.com/ugc/16183377078069002425/D59212FA5735040944DFE5F461283944E28A8421/",
+    "hcontent_preview": "16183377078069002425",
+    "title": "Dystopic City Port [4K, Ambient]",
+    "description": "Dystopic Future City ambience\n\nDynamic Sounds, 4K\n\nAdded date & time",
+    "time_created": 1791414402,
+    "time_updated": 1791491547,
+    "visibility": 0,
+    "banned": 0,
+    "ban_reason": "",
+    "subscriptions": 7265,
+    "favorited": 243,
+    "lifetime_subscriptions": 9552,
+    "lifetime_favorited": 269,
+    "views": 928,
+    "tags": [
+     {
+      "tag": "Scene"
+     },
+     {
+      "tag": "Relaxing"
+     },
+     {
+      "tag": "Wallpaper"
+     },
+     {
+      "tag": "Customizable"
+     },
+     {
+      "tag": "3840 x 2160"
+     },
+     {
+      "tag": "Everyone"
+     },
+     {
+      "tag": "Approved"
+     }
+    ]
+   },
+   {
+    "publishedfileid": "1",
+    "result": 9
+   }
+  ]
+ }
+}

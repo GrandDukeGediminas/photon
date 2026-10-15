@@ -1,0 +1,11 @@
+# Limits for the synthetic CC0 scenes (scripts/linux/scenes-check.sh, pixeldiff.py --thresholds). 640x360, t = 2 s,
+# PHOTON_SEED=1. Columns: id, max mean absolute per-channel difference (0..255), max pixels whose largest channel
+# difference is > 32. lavapipe is deterministic on one Mesa version and CPU architecture (two runs are byte-identical),
+# but the refs come from arm64 and hosted CI runs x86_64, so the limits are the Metal-vs-lavapipe envelope measured on
+# 2026-10-14 (mean × 1.25 + 0.05, pixels × 1.5 + 20; web: no macOS counterpart, 0.3 / 50).
+images       0.106   20
+effects      0.080   20
+particles    0.124   20
+text         0.198   22
+perspective  0.200   316
+web          0.300   50
