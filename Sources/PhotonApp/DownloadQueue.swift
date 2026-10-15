@@ -143,10 +143,9 @@ package final class DownloadQueue: ObservableObject {
     }
 
     package static func loginMessage(username: String, reason: String) -> String {
-        "steamcmd has no saved Steam login (\(reason)). Open Terminal and run `\(loginCommand(username: username))` once: "
-            + "steamcmd asks for your password and Steam Guard code there and remembers the login. Then press Retry. "
-            + "The saved login belongs to the exact name you type, capitals included, so it must match the Steam "
-            + "username in Settings. photon never sees or stores your password."
+        "steamcmd has no saved Steam login for \(username.isEmpty ? "this account" : "“\(username)”") (\(reason)). Use Sign In "
+            + "to sign in once: your password and Steam Guard code go only to steamcmd, which remembers the login. "
+            + "(In a terminal: `\(loginCommand(username: username))`.) Saved logins match the exact name, capitals included."
     }
 
     // MARK: running

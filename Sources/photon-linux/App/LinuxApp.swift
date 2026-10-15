@@ -45,7 +45,35 @@ final class LinuxApp {
               + "displays: \(state.displays.map(\.id).joined(separator: ", ")); settings \((defaults as? XDGDefaults)?.fileURL.path ?? "defaults")")
     }
 
+    /// Wallpaper Engine ownership (`OwnershipCheck`): nothing starts until the Steam account passed it.
+    lazy var ownership = OwnershipCheck(workshop: state.workshop, defaults: defaults)
+    private var ownershipWindow: OwnershipWindow?
+    private(set) var started = false
+
+    /// `start` once the account owns Wallpaper Engine: at once after a recent success (re-checked in the background when
+    /// a week old; only a definite "not owned" then quits), else after the ownership window's check passes.
+    func startWhenOwned(showBrowser: Bool) {
+        LinuxApp.current = self
+        if ownership.mayStart {
+            start(showBrowser: showBrowser)
+            if ownership.dueForRecheck {
+                ownership.check { [weak self] status in
+                    guard status == .notOwned else { return }
+                    print("photon: this Steam account doesn't own Wallpaper Engine; quitting")
+                    self?.quit()
+                }
+            }
+        } else {
+            ownershipWindow = OwnershipWindow(app: self) { [weak self] in
+                self?.ownershipWindow = nil
+                self?.start(showBrowser: showBrowser)
+            }
+        }
+    }
+
     func start(showBrowser: Bool) {
+        guard !started else { return }
+        started = true
         LinuxApp.current = self
         AudioSystem.shared.pollPeriodMs = AudioSystem.pollPeriod(fps: state.fps)
         photon_css_apply(Self.css)
@@ -86,6 +114,7 @@ final class LinuxApp {
     /// A second `photon-linux app` launch (single instance, D-Bus `Activate`): apply the wallpaper it names, and raise
     /// the browser unless it was a `--background` start (login autostart while the app already runs).
     func activated(by args: [String], token: String) {
+        guard started else { return }
         let background = args.contains("--background")
         print("photon: activated by another launch (\(args.isEmpty ? "no arguments" : args.joined(separator: " ")))")
         if let target = args.first(where: { !$0.hasPrefix("-") }) {
@@ -101,6 +130,14 @@ final class LinuxApp {
     nonisolated(unsafe) static var pendingActivations: [([String], String)] = []
 
     func browserClosed() { state.playlists.uiOpen = false }
+
+    private(set) var signInWindow: SteamSignInWindow?
+
+    /// steamcmd setup and Steam sign-in (SteamSignInWindow).
+    func showSignIn() {
+        if signInWindow == nil { signInWindow = SteamSignInWindow(workshop: state.workshop) }
+        signInWindow?.present()
+    }
 
     /// The Steam Workshop browser (WorkshopWindow).
     func showWorkshop() {
@@ -226,7 +263,8 @@ final class LinuxApp {
             }
             app.state.apply(id, display: nil)
         }
-        app.start(showBrowser: !background && selfTest == nil)
+        // The self-test runs on stand-in assets without a Steam account (its settings live in OUTDIR and it quits when done).
+        if selfTest != nil { app.start(showBrowser: false) } else { app.startWhenOwned(showBrowser: !background) }
         for (a, t) in pendingActivations { app.activated(by: a, token: t) }
         pendingActivations = []
         var status: Int32 = 0

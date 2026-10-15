@@ -101,10 +101,13 @@ package enum WorkshopPaths {
     /// Workshop folders to scan, existing or not on macOS (steamcmd's first, so its copy wins a duplicate id), existing
     /// ones only on Linux; symlinked duplicates removed.
     package static var workshopLibraries: [URL] {
+        // steamcmd that photon set up itself (SteamCmdInstaller) keeps its downloads in its own folder.
+        let own = contentDirectory(steamRoot: SteamCmdInstaller.directory)
+        let ownIfPresent = FileManager.default.fileExists(atPath: own.path) ? [own] : []
         #if os(macOS)
-        return unique([steamcmdContent, crossOverContent])
+        return unique([steamcmdContent, crossOverContent] + ownIfPresent)
         #else
-        return unique(steamcmdRoots.map(contentDirectory).filter { FileManager.default.fileExists(atPath: $0.path) })
+        return unique(steamcmdRoots.map(contentDirectory).filter { FileManager.default.fileExists(atPath: $0.path) } + ownIfPresent)
         #endif
     }
 

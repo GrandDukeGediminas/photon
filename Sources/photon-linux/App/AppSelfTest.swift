@@ -236,6 +236,41 @@ final class AppSelfTest {
             w.setMode(subscribed: false)
             gtk_widget_hide(w.window)
         }
+        // Steam sign-in inside the app (SteamSignInWindow) with the fake steamcmd: password, then an emailed Steam Guard
+        // code (a wrong one first). Nothing reaches Steam.
+        let fake = "/src/Tests/fixtures/workshop/fake-steamcmd.sh"
+        var savedUser = "", savedPath = ""
+        step("sign-in password", wait: 1500) { [self] in
+            let w: WorkshopController = state.workshop
+            savedUser = w.username; savedPath = w.steamcmdPath
+            w.steamcmdPath = fake
+            w.username = "email"
+            app.showSignIn()
+            w.signIn.start(username: "email")
+        }
+        step("sign-in code", wait: 1500) { [self] in
+            let w: WorkshopController = state.workshop
+            check(w.signIn.state == .needsPassword, "sign-in asks for the password (\(w.signIn.state))")
+            if let win = app.signInWindow { snapshot(win.window, "05-signin-password.png") }
+            w.signIn.submitPassword("right")
+        }
+        step("sign-in wrong code", wait: 1500) { [self] in
+            let w: WorkshopController = state.workshop
+            check(w.signIn.state == .needsCode(.email, retry: false), "sign-in asks for the emailed Steam Guard code (\(w.signIn.state))")
+            w.signIn.submitCode("BAD")
+        }
+        step("sign-in good code", wait: 1500) { [self] in
+            let w: WorkshopController = state.workshop
+            check(w.signIn.state == .needsCode(.email, retry: true), "a refused code is asked for again (\(w.signIn.state))")
+            if let win = app.signInWindow { snapshot(win.window, "05-signin-code.png") }
+            w.signIn.submitCode("GOOD1")
+        }
+        step("signed in", wait: 500) { [self] in
+            let w: WorkshopController = state.workshop
+            check(w.signIn.state == .signedIn, "signed in (\(w.signIn.state))")
+            w.username = savedUser; w.steamcmdPath = savedPath
+            if let win = app.signInWindow { gtk_widget_hide(win.window) }
+        }
         step("tray", wait: 2500) { [self] in
             guard let tray = app.tray else { return check(false, "status icon") }
             let labels = tray.entries.map(\.label)

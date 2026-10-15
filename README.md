@@ -7,7 +7,7 @@ The behaviour comes from reverse engineering the real engine (`wallpaper64.exe` 
 ## Requirements
 
 - macOS 14 or later, Apple silicon or a Metal-capable GPU.
-- Wallpaper Engine owned on Steam. The Windows build has to be installed somewhere readable, for example a CrossOver bottle. The default path is `~/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/wallpaper_engine/assets`. Override it with `PHOTON_WE_ASSETS`.
+- Wallpaper Engine owned on Steam. photon checks this at launch with steamcmd (`+login <account> +licenses_for_app 431960`). The launch window sets everything up in the app: it can download Valve's steamcmd into photon's folder, and signs steamcmd in (password and Steam Guard code are passed straight to steamcmd and never stored; steamcmd keeps its own login) and re-checks weekly; a successful check covers 30 days offline. The Windows build has to be installed somewhere readable, for example a CrossOver bottle. The default path is `~/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/wallpaper_engine/assets`. Override it with `PHOTON_WE_ASSETS`.
 - Workshop items downloaded by Steam for macOS to `~/Library/Application Support/Steam/steamapps/workshop/content/431960`.
 - `glslangValidator` and `spirv-cross` from Homebrew, at `/opt/homebrew/bin`. Shaders go WE dialect → HLSL (the engine's own translation) → SPIR-V → Metal, and the results are cached in `~/Library/Caches/photon2/shaders`.
 

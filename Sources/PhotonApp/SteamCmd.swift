@@ -6,7 +6,8 @@ import Glibc
 #endif
 
 /// Finding steamcmd. It's never bundled: the user installs it (Homebrew cask `steamcmd` on macOS, the distribution's
-/// `steamcmd` package or Valve's tarball on Linux).
+/// `steamcmd` package or Valve's tarball on Linux), or photon downloads Valve's tarball into its own folder
+/// (`SteamCmdInstaller`).
 package enum SteamCmdLocator {
     package static var candidates: [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -15,6 +16,7 @@ package enum SteamCmdLocator {
         for dir in (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
             list.append(String(dir) + "/steamcmd")
         }
+        list.append(SteamCmdInstaller.directory.appendingPathComponent("steamcmd.sh").path)
         return list
     }
 
@@ -77,7 +79,7 @@ package struct SteamCmdOutputParser {
     private static let failure = try! NSRegularExpression(pattern: #"ERROR! Download item ([0-9]+) failed \((.*)\)"#)
     private static let timeout = try! NSRegularExpression(pattern: #"ERROR! Timeout downloading item ([0-9]+)"#)
     private static let downloading = try! NSRegularExpression(pattern: #"Downloading item ([0-9]+)"#)
-    private static let failedReason = try! NSRegularExpression(pattern: #"FAILED \(([^)]*)\)"#)
+    private static let failedReason = try! NSRegularExpression(pattern: #"(?:FAILED|ERROR) \(([^)]*)\)"#)
 
     /// Login refusals that a terminal login fixes (as opposed to rate limiting or a Steam outage).
     private static let loginReasons = ["password", "two-factor", "two factor", "steam guard", "logon denied", "login denied",
@@ -159,6 +161,12 @@ package protocol SteamCmdProcess: AnyObject {
                output: @escaping (String) -> Void, exit: @escaping (Int32) -> Void) throws
     /// Stops it and everything it started.
     func terminate()
+    /// Writes to its standard input (interactive runs only: the sign-in answers steamcmd's prompts this way).
+    func write(_ text: String)
+}
+
+extension SteamCmdProcess {
+    package func write(_ text: String) {}
 }
 
 package enum SteamCmdProcessError: LocalizedError {
@@ -172,11 +180,29 @@ package enum SteamCmdProcessError: LocalizedError {
 /// posix_spawn in a process group of its own, so that `terminate` also stops the steamcmd binary its launcher script
 /// runs (the script waits on it rather than exec'ing it). stdin is /dev/null: steamcmd never gets typed input.
 package final class SpawnedSteamCmd: SteamCmdProcess {
+    /// Give steamcmd a pipe as standard input (`write`) instead of /dev/null.
+    private let interactive: Bool
+    private var stdinFD: Int32 = -1
     private var pid: pid_t = 0
     private let lock = NSLock()
     private var exited = false
 
-    package init() {}
+    package init(interactive: Bool = false) { self.interactive = interactive }
+
+    package func write(_ text: String) {
+        lock.lock(); let fd = stdinFD; lock.unlock()
+        guard fd >= 0 else { return }
+        var bytes = Array(text.utf8)
+        _ = bytes.withUnsafeMutableBytes { buf -> Int in
+            #if canImport(Darwin)
+            return Darwin.write(fd, buf.baseAddress, buf.count)
+            #else
+            return Glibc.write(fd, buf.baseAddress, buf.count)
+            #endif
+        }
+        // The password passes through this buffer only; overwrite it before it is freed.
+        for i in bytes.indices { bytes[i] = 0 }
+    }
 
     package func start(executable: String, arguments: [String], environment: [String: String],
                        output: @escaping (String) -> Void, exit: @escaping (Int32) -> Void) throws {
@@ -194,7 +220,15 @@ package final class SpawnedSteamCmd: SteamCmdProcess {
         posix_spawn_file_actions_init(&actions)
         posix_spawnattr_init(&attr)
         defer { posix_spawn_file_actions_destroy(&actions); posix_spawnattr_destroy(&attr) }
-        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+        var input: [Int32] = [-1, -1]
+        if interactive {
+            guard pipe(&input) == 0 else { close(readFD); close(writeFD); throw SteamCmdProcessError.spawn(errno) }
+            posix_spawn_file_actions_adddup2(&actions, input[0], 0)
+            posix_spawn_file_actions_addclose(&actions, input[0])
+            posix_spawn_file_actions_addclose(&actions, input[1])
+        } else {
+            posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+        }
         posix_spawn_file_actions_adddup2(&actions, writeFD, 1)
         posix_spawn_file_actions_adddup2(&actions, writeFD, 2)
         posix_spawn_file_actions_addclose(&actions, readFD)
@@ -216,8 +250,13 @@ package final class SpawnedSteamCmd: SteamCmdProcess {
         var child: pid_t = 0
         let rc = posix_spawn(&child, executable, &actions, &attr, argv, envp)
         close(writeFD)
-        guard rc == 0 else { close(readFD); throw SteamCmdProcessError.spawn(rc) }
-        lock.lock(); pid = child; lock.unlock()
+        if input[0] >= 0 { close(input[0]) }
+        guard rc == 0 else {
+            close(readFD)
+            if input[1] >= 0 { close(input[1]) }
+            throw SteamCmdProcessError.spawn(rc)
+        }
+        lock.lock(); pid = child; stdinFD = input[1]; lock.unlock()
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var buf = [UInt8](repeating: 0, count: 8192)
@@ -238,7 +277,10 @@ package final class SpawnedSteamCmd: SteamCmdProcess {
             close(readFD)
             var status: Int32 = 0
             while waitpid(child, &status, 0) < 0 && errno == EINTR {}
-            self?.lock.lock(); self?.exited = true; self?.lock.unlock()
+            self?.lock.lock()
+            self?.exited = true
+            if let fd = self?.stdinFD, fd >= 0 { close(fd); self?.stdinFD = -1 }
+            self?.lock.unlock()
             // WIFEXITED / WEXITSTATUS; a signal gives 128 + signal, as shells report it.
             let code = (status & 0x7f) == 0 ? (status >> 8) & 0xff : 128 + (status & 0x7f)
             exit(code)

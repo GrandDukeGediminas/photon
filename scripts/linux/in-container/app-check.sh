@@ -115,6 +115,17 @@ single_instance() {
   dbus-daemon --session --fork --print-address=3 --print-pid=4 3>"$dir/.bus" 4>"$dir/.buspid"
   DBUS_SESSION_BUS_ADDRESS=$(head -1 "$dir/.bus"); export DBUS_SESSION_BUS_ADDRESS
   pid=$(head -1 "$dir/.buspid")
+  # The app starts only for a Steam account that owns Wallpaper Engine: a test account and the fake steamcmd
+  # (Tests/fixtures/workshop/fake-steamcmd.sh reports an active licence), so the first launch goes through the real check.
+  mkdir -p $dir/si/photon2
+  cat > $dir/si/photon2/photon2.plist <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>steamusername</key><string>tester</string>
+<key>steamcmdpath</key><string>/src/Tests/fixtures/workshop/fake-steamcmd.sh</string>
+</dict></plist>
+PLIST
   XDG_CONFIG_HOME=$dir/si timeout -k 5 60 "$bin" app --no-hosts --background > "$dir/si-first.log" 2>&1 & first=$!
   sleep 4
   item=${PHOTON_SELFTEST_ITEMS%%,*}
@@ -128,6 +139,7 @@ single_instance() {
   [ $second = 0 ] && grep -q 'already running; activated the running instance' "$dir/si-second.log" || ok=1
   grep -q "activated by another launch ($item)" "$dir/si-first.log" || ok=1
   [ $third = 0 ] && grep -q 'activated by another launch (--background)' "$dir/si-first.log" || ok=1
+  grep -q '<key>ownershipverified</key>' "$dir/si/photon2/photon2.plist" || ok=1
   grep -q "\"$item\"" "$dir/si/photon2/photon2.plist" 2>/dev/null || grep -q "<string>$item</string>" "$dir/si/photon2/photon2.plist" || ok=1
   if [ $ok = 0 ]; then echo "$name: PASS: single instance: a second launch activated the first ($item applied there) and exited"
   else echo "$name: FAIL: single instance"; sed 's/^/  first: /' "$dir/si-first.log" | tail -5; sed 's/^/  second: /' "$dir/si-second.log"; fail=1; fi

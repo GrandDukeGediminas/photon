@@ -18,6 +18,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsWindow: NSWindow?
     private var monitor: PlaybackMonitor?
     private var subscriptions: Set<AnyCancellable> = []
+    /// Wallpaper Engine ownership (`OwnershipCheck`): nothing starts until the Steam account passed it.
+    lazy var ownership = OwnershipCheck(workshop: state.workshop, defaults: state.defaults)
+    private var gate: NSWindow?
+    private var started = false
 
     init(state: AppState, device: MTLDevice) {
         self.state = state
@@ -46,6 +50,54 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if ownership.mayStart {
+            start()
+            if ownership.dueForRecheck { recheckOwnership() }
+        } else {
+            showOwnershipGate()
+        }
+    }
+
+    /// The window shown until the account passes the ownership check.
+    private func showOwnershipGate() {
+        let view = OwnershipGateView(ownership: ownership, workshop: state.workshop) { [weak self] in
+            guard let self else { return }
+            self.gate?.close()
+            self.gate = nil
+            self.start()
+        }
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 360), styleMask: [.titled, .closable],
+                         backing: .buffered, defer: false)
+        w.title = "photon"
+        w.contentView = NSHostingView(rootView: view)
+        w.isReleasedWhenClosed = false
+        w.center()
+        gate = w
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            guard let self, !self.started else { return }
+            NSApp.terminate(nil)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        w.makeKeyAndOrderFront(nil)
+    }
+
+    /// The weekly re-check while running: only a definite "not owned" stops photon; no connection or no saved login keeps
+    /// the last success until its grace period ends.
+    private func recheckOwnership() {
+        ownership.check { [weak self] status in
+            guard let self, status == .notOwned else { return }
+            let alert = NSAlert()
+            alert.messageText = "Wallpaper Engine isn't owned by this Steam account"
+            alert.informativeText = "photon runs only for a Steam account that owns Wallpaper Engine. photon will quit."
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            NSApp.terminate(nil)
+        }
+    }
+
+    private func start() {
+        guard !started else { return }
+        started = true
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "photo.on.rectangle.angled", accessibilityDescription: "photon")
         let menu = NSMenu()

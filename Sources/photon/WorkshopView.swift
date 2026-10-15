@@ -21,10 +21,10 @@ struct WorkshopBrowser: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            if let problem = queue.loginProblem { LoginNotice(message: problem, username: workshop.username, retry: queue.retry) }
+            if let problem = queue.loginProblem { LoginNotice(message: problem, workshop: workshop) }
             if workshop.username.trimmingCharacters(in: .whitespaces).isEmpty || workshop.steamcmdExecutable == nil {
                 SetupNotice(hasUser: !workshop.username.trimmingCharacters(in: .whitespaces).isEmpty,
-                            hasSteamcmd: workshop.steamcmdExecutable != nil)
+                            hasSteamcmd: workshop.steamcmdExecutable != nil, workshop: workshop)
             }
             results
             if !queue.jobs.isEmpty {
@@ -144,10 +144,10 @@ struct SubscribedBrowser: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            if let problem = queue.loginProblem { LoginNotice(message: problem, username: workshop.username, retry: queue.retry) }
+            if let problem = queue.loginProblem { LoginNotice(message: problem, workshop: workshop) }
             if workshop.username.trimmingCharacters(in: .whitespaces).isEmpty || workshop.steamcmdExecutable == nil {
                 SetupNotice(hasUser: !workshop.username.trimmingCharacters(in: .whitespaces).isEmpty,
-                            hasSteamcmd: workshop.steamcmdExecutable != nil)
+                            hasSteamcmd: workshop.steamcmdExecutable != nil, workshop: workshop)
             }
             summary
             Divider()
@@ -463,46 +463,50 @@ struct WorkshopDetail: View {
     }
 }
 
-/// steamcmd has no cached login: how to fix it.
+/// steamcmd has no saved login: sign in from here.
 private struct LoginNotice: View {
     let message: String
-    let username: String
-    let retry: () -> Void
+    @ObservedObject var workshop: WorkshopController
+    @State private var signingIn = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("Steam login needed", systemImage: "person.badge.key").font(.headline)
-            Text(message).font(.caption).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Text(DownloadQueue.loginCommand(username: username))
-                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                    .padding(4).background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)))
-                Button("Copy") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(DownloadQueue.loginCommand(username: username), forType: .string)
-                }
-                Spacer()
-                Button("Retry", action: retry)
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "person.badge.key").font(.title3)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Steam sign-in needed").font(.headline)
+                Text("steamcmd has no saved Steam login, so downloads are paused. Sign in once and they continue.")
+                    .font(.caption).fixedSize(horizontal: false, vertical: true)
             }
+            Spacer()
+            Button("Sign In…") { signingIn = true }
+            Button("Retry") { workshop.queue.retry() }
         }
         .padding(10)
         .background(Color.orange.opacity(0.12))
+        .help(message)
+        .sheet(isPresented: $signingIn) { SteamSignInSheet(workshop: workshop) }
     }
 }
 
 private struct SetupNotice: View {
     let hasUser: Bool
     let hasSteamcmd: Bool
+    var workshop: WorkshopController? = nil
+    @State private var settingUp = false
 
     var body: some View {
         HStack(alignment: .top) {
             Image(systemName: "info.circle")
             VStack(alignment: .leading, spacing: 2) {
-                if !hasSteamcmd { Text("Downloading needs steamcmd: brew install --cask steamcmd (or set its path in Settings).") }
-                if !hasUser { Text("Set your Steam username in Settings to download. Browsing works without it.") }
+                if !hasSteamcmd { Text("Downloading needs steamcmd, Valve's command-line Steam. photon can set it up.") }
+                if !hasUser { Text("Set your Steam username to download. Browsing works without it.") }
             }
             .font(.caption)
             Spacer()
+            if let workshop {
+                Button(hasSteamcmd ? "Sign In…" : "Set Up…") { settingUp = true }
+                    .sheet(isPresented: $settingUp) { SteamSignInSheet(workshop: workshop) }
+            }
             Button("Settings…") { NSApp.sendAction(Selector(("showSettings")), to: nil, from: nil) }
         }
         .padding(8)
@@ -563,6 +567,7 @@ private struct DownloadList: View {
 struct WorkshopSettingsSection: View {
     @ObservedObject var state: AppState
     @ObservedObject var workshop: WorkshopController
+    @State private var signingIn = false
 
     init(state: AppState) {
         self.state = state
@@ -574,12 +579,16 @@ struct WorkshopSettingsSection: View {
             TextField("Steam username", text: $workshop.username)
                 .textContentType(.username)
                 .autocorrectionDisabled()
-            Text("Only the account name is stored. Downloads use the login steamcmd saved when you ran "
-                 + "`\(DownloadQueue.loginCommand(username: workshop.username))` once in Terminal (password and Steam Guard "
-                 + "are entered there, never in photon).")
-                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text("Only the account name is stored. steamcmd keeps its own login after you sign in once; your password "
+                     + "and Steam Guard code go only to steamcmd.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(workshop.steamcmdExecutable == nil ? "Set Up steamcmd…" : "Sign In…") { signingIn = true }
+                    .sheet(isPresented: $signingIn) { SteamSignInSheet(workshop: workshop) }
+            }
             TextField("steamcmd path", text: $workshop.steamcmdPath, prompt: Text("Automatic"))
-            Text(workshop.steamcmdExecutable.map { "Using \($0)" } ?? "steamcmd not found. Install it with: brew install --cask steamcmd")
+            Text(workshop.steamcmdExecutable.map { "Using \($0)" } ?? "steamcmd isn't set up. Use Set Up steamcmd above, or install it with: brew install --cask steamcmd")
                 .font(.caption).foregroundStyle(workshop.steamcmdExecutable == nil ? .orange : .secondary)
             Picker("Age ratings shown", selection: $workshop.rating) {
                 ForEach(WorkshopRatingFilter.allCases) { Text($0.label).tag($0) }

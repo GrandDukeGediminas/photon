@@ -340,7 +340,7 @@ final class WorkshopWindow {
         let w = workshop
         let user = w.username.trimmingCharacters(in: .whitespaces)
         var lines: [String] = []
-        if w.steamcmdExecutable == nil { lines.append("Downloading needs steamcmd (your distribution's steamcmd package, or set its path in Settings).") }
+        if w.steamcmdExecutable == nil { lines.append("Downloading needs steamcmd, Valve's command-line Steam: use Set Up below, install your distribution's steamcmd package, or set its path in Settings.") }
         if user.isEmpty { lines.append("Set your Steam username in Settings to download. Browsing works without it.") }
         let problem = w.queue.loginProblem
         let key = lines.joined() + (problem ?? "")
@@ -348,16 +348,19 @@ final class WorkshopWindow {
         noticeKey = key
         removeChildren(notice)
         if let problem {
-            pack(notice, label("Steam login needed", css: "photon-section"))
-            pack(notice, label(problem, wrap: true))
+            pack(notice, label("Steam sign-in needed", css: "photon-section"))
             let row = box(false, spacing: 8)
-            let cmd = label(DownloadQueue.loginCommand(username: user), xalign: 0)
-            gtk_label_set_selectable(G(cmd), 1)
-            pack(row, cmd, expand: true)
+            let text = label("steamcmd has no saved Steam login, so downloads are paused. Sign in once and they continue.", wrap: true)
+            gtk_widget_set_tooltip_text(text, problem)
+            pack(row, text, expand: true)
+            pack(row, button("Sign In…") { [weak self] in self?.app.showSignIn() })
             pack(row, button("Retry") { [weak self] in self?.workshop.queue.retry() })
             pack(notice, row)
         }
         for l in lines { pack(notice, label(l, css: "photon-dim", wrap: true)) }
+        if problem == nil && (w.steamcmdExecutable == nil || !user.isEmpty) && !lines.isEmpty {
+            pack(notice, button(w.steamcmdExecutable == nil ? "Set Up steamcmd…" : "Sign In…") { [weak self] in self?.app.showSignIn() })
+        }
         gtk_widget_show_all(notice)
         gtk_widget_set_visible(notice, key.isEmpty ? 0 : 1)
     }

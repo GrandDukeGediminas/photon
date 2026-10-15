@@ -28,9 +28,10 @@ package enum SteamSubscriptions {
         let home = FileManager.default.homeDirectoryForCurrentUser
         #if os(macOS)
         return [home.appendingPathComponent("Library/Application Support/Steam"),
-                home.appendingPathComponent("Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam")]
+                home.appendingPathComponent("Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam"),
+                SteamCmdInstaller.directory]
         #else
-        return WorkshopPaths.steamcmdRoots
+        return WorkshopPaths.steamcmdRoots + [SteamCmdInstaller.directory]
         #endif
     }
 

@@ -105,6 +105,24 @@ package final class WorkshopController: ObservableObject {
 
     package var steamcmdExecutable: String? { SteamCmdLocator.find(override: steamcmdPath) }
 
+    /// Downloads Valve's steamcmd into photon's folder when none is installed.
+    package let installer = SteamCmdInstaller()
+    /// Signs steamcmd in from photon's own window (password and Steam Guard code go straight to steamcmd).
+    package lazy var signIn: SteamLogin = {
+        let l = SteamLogin()
+        l.executable = { [weak self] in self?.steamcmdExecutable }
+        l.environment = queue.environment
+        l.queue = queue
+        return l
+    }()
+
+    package func setUpSteamCmd(completion: ((String?) -> Void)? = nil) {
+        installer.install { [weak self] path in
+            self?.objectWillChange.send()
+            completion?(path)
+        }
+    }
+
     /// Where steamcmd puts items: the folder an earlier download reported, else its default.
     package var downloadDirectory: URL {
         if let p = defaults.string(forKey: "steamcmdcontent"), !p.isEmpty { return URL(fileURLWithPath: p) }
