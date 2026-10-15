@@ -2,7 +2,7 @@
 
 A native macOS rebuild of Wallpaper Engine's scene renderer, written in Swift and Metal.
 
-The behaviour comes from reverse engineering the real engine (`wallpaper64.exe` and `scenescript64.dll`). The findings are in [`docs/re/`](docs/re/README.md), with function addresses for each claim. Wallpapers render from your own Steam workshop downloads, and the engine's base assets (shaders, materials, effects, script prelude) are read from your Wallpaper Engine install at runtime. Nothing from the engine is copied into this repo.
+The behaviour comes from reverse engineering the real engine (`wallpaper64.exe` and `scenescript64.dll`). This repository publishes only the clean-room implementation: no engine binaries, no decompiled code, and not the reverse-engineering notes (`docs/re/…` references in comments point to those private notes). Wallpapers render from your own Steam workshop downloads, and the engine's base assets (shaders, materials, effects, script prelude) are read from your Wallpaper Engine install at runtime. Nothing from the engine is copied into this repo.
 
 ## Requirements
 
@@ -122,7 +122,7 @@ and comparing them against their previews:
 - `def:sheep` is a Windows application (`.exe`) wallpaper, which can't run on macOS.
 - 5 wallpapers hit shader-authoring bugs that fail to compile in the real engine too. Both engines fall back to `dx11fallback`.
 
-Session 6 resolved every open item in [`docs/re/unknowns.md`](docs/re/unknowns.md), including the ones no corpus wallpaper uses. These were traced in the binary and tested with synthetic scenes:
+Session 6 resolved every open item in the reverse-engineering notes, including the ones no corpus wallpaper uses. These were traced in the binary and tested with synthetic scenes:
 - planar reflections;
 - the error texture;
 - frustum culling;
