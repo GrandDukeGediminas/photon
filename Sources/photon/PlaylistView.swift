@@ -254,6 +254,46 @@ struct PlaylistSettingsSheet: View {
         }
     }
 
+    private var transitionBinding: Binding<Int> {
+        Binding(get: { transitionValue }, set: { v in
+            let value: String
+            switch v {
+            case -1: value = "none"
+            case -3: value = "random"
+            default: value = String(v)
+            }
+            settings["transition"] = value
+        })
+    }
+
+    // Split out of `body`: Xcode 26's type checker gives up on the whole form in one expression.
+    @ViewBuilder private var transitionSection: some View {
+        Picker(t("ui_browse_playlist_modal_settings_transition_enabled"), selection: transitionBinding) {
+            ForEach(SettingsView.transitionOptions, id: \.1) { Text(t($0.0)).tag($0.1) }
+        }
+        if transitionValue == -3 {
+            // transitionPoolToggle: absent pool = every effect.
+            let pool = settings["transitionpool"] as? [String]
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], alignment: .leading) {
+                ForEach(SettingsView.transitionOptions.filter { $0.1 >= 0 }, id: \.1) { option in
+                    Toggle(t(option.0), isOn: Binding(get: { pool?.contains(String(option.1)) ?? true }, set: { on in
+                        var p = pool ?? SettingsView.transitionOptions.filter { $0.1 >= 0 }.map { String($0.1) }
+                        p.removeAll { $0 == String(option.1) }
+                        if on { p.append(String(option.1)) }
+                        settings["transitionpool"] = p
+                    }))
+                    .toggleStyle(.checkbox)
+                }
+            }
+        }
+        if transitionValue != -1 && transitionValue != -2 {
+            Slider(value: Binding(get: { (settings["transitiontime"] as? NSNumber)?.doubleValue ?? 1000 },
+                                  set: { settings["transitiontime"] = Int($0) }), in: 0...3000, step: 50) {
+                Text("\(t("ui_browse_playlist_modal_settings_transition_time")) \((settings["transitiontime"] as? NSNumber)?.intValue ?? 1000) ms")
+            }
+        }
+    }
+
     var body: some View {
         Form {
             Picker(t("ui_browse_playlist_modal_settings_timing_label"), selection: Binding(get: { mode }, set: { settings["mode"] = $0 })) {
@@ -279,32 +319,7 @@ struct PlaylistSettingsSheet: View {
             if mode == "dayofweek" && itemCount > 7 {
                 Text(t("ui_browse_playlist_modal_settings_day_of_week_warning_message")).font(.caption).foregroundStyle(.orange)
             }
-            Picker(t("ui_browse_playlist_modal_settings_transition_enabled"), selection: Binding(get: { transitionValue }, set: { v in
-                settings["transition"] = v == -1 ? "none" : v == -3 ? "random" : String(v)
-            })) {
-                ForEach(SettingsView.transitionOptions, id: \.1) { Text(t($0.0)).tag($0.1) }
-            }
-            if transitionValue == -3 {
-                // transitionPoolToggle: absent pool = every effect.
-                let pool = settings["transitionpool"] as? [String]
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], alignment: .leading) {
-                    ForEach(SettingsView.transitionOptions.filter { $0.1 >= 0 }, id: \.1) { option in
-                        Toggle(t(option.0), isOn: Binding(get: { pool?.contains(String(option.1)) ?? true }, set: { on in
-                            var p = pool ?? SettingsView.transitionOptions.filter { $0.1 >= 0 }.map { String($0.1) }
-                            p.removeAll { $0 == String(option.1) }
-                            if on { p.append(String(option.1)) }
-                            settings["transitionpool"] = p
-                        }))
-                        .toggleStyle(.checkbox)
-                    }
-                }
-            }
-            if transitionValue != -1 && transitionValue != -2 {
-                Slider(value: Binding(get: { (settings["transitiontime"] as? NSNumber)?.doubleValue ?? 1000 },
-                                      set: { settings["transitiontime"] = Int($0) }), in: 0...3000, step: 50) {
-                    Text("\(t("ui_browse_playlist_modal_settings_transition_time")) \((settings["transitiontime"] as? NSNumber)?.intValue ?? 1000) ms")
-                }
-            }
+            transitionSection
             if mode == "timer" {
                 Toggle(t("ui_browse_playlist_modal_settings_video_sequence"), isOn: bool("videosequence"))
                 Toggle(t("ui_browse_playlist_modal_settings_update_on_pause"), isOn: bool("updateonpause"))

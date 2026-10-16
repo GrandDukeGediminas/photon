@@ -725,9 +725,11 @@ final class SceneScriptEngine {
         if !scene.isOrtho {
             let v = f.view
             let forward = -SIMD3(v[0][2], v[1][2], v[2][2])
-            list = list.enumerated().map { (i, o) -> (Float, Int, SceneObject) in
-                ((o as? ImageLayer)?.sortsLast ?? false ? -Float.infinity : simd_dot(o.origin, forward), i, o)
-            }.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1 < $1.1 }.map { $0.2 }
+            let keyed = list.enumerated().map { (i, o) -> (depth: Float, index: Int, object: SceneObject) in
+                let last = (o as? ImageLayer)?.sortsLast ?? false
+                return (last ? -Float.infinity : simd_dot(o.origin, forward), i, o)
+            }
+            list = keyed.sorted { a, b in a.depth != b.depth ? a.depth > b.depth : a.index < b.index }.map(\.object)
         }
         let (camA, camB) = cursorRay()
         let parallaxHit = scene.cameraParallax && scene.userParallax && scene.isOrtho
