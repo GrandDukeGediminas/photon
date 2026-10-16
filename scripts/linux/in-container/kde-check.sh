@@ -30,6 +30,20 @@ cp "$(readlink -f $bin)" /usr/bin/photon-linux
 fail=0
 note() { printf '\n-- %s\n' "$*"; }
 
+# waitfor <log> <pattern> [count] [seconds]: until the log has <count> (default 1) lines matching the pattern. KWin checks
+# every new client against the .desktop entries, which takes longer the larger the executable (about 1 s per connection
+# for the 62 MB packaged binary, and the Vulkan loader's device-select layer opens two more connections), so the steps
+# wait for the host instead of sleeping a fixed time.
+waitfor() {
+  n=${3:-1}; end=$(( $(date +%s) + ${4:-40} ))
+  while [ "$(grep -c -- "$2" "$1" 2>/dev/null)" -lt "$n" ]; do
+    [ "$(date +%s)" -ge $end ] && { echo "kde: timed out waiting for '$2' in $(basename "$1")"; return 1; }
+    sleep 0.2
+  done
+}
+# ready <log>: the host configured both outputs (swapchains made); then a moment for its first frame to be presented.
+ready() { waitfor "$1" ': configured' 2 && sleep 1.5; }
+
 # start_kwin: KWin with two virtual outputs on its own session bus (started by the caller: dbus-run-session).
 start_kwin() {
   rm -f $XDG_RUNTIME_DIR/wayland-k*
@@ -77,11 +91,11 @@ grep '^X-KDE-Wayland-Interfaces' $XDG_DATA_HOME/applications/photon2-kwin.deskto
 note "1, 2. protocol granted; both outputs through the swapchain vs headless"
 start_kwin
 photon-linux desktop --list-outputs --backend wayland
-photon-linux desktop $wp --backend wayland --seconds 4 --fps 2 --still --time 2 --hold 4 --no-sound > $t/still.log 2>&1 & host=$!
-sleep 6
+photon-linux desktop $wp --backend wayland --seconds 60 --fps 2 --still --time 2 --hold 60 --no-sound > $t/still.log 2>&1 & host=$!
+ready $t/still.log || fail=1
 python3 /scripts/in-container/kwin_screenshot.py Virtual-0 $t/shot-0.png || fail=1
 python3 /scripts/in-container/kwin_screenshot.py Virtual-1 $t/shot-1.png || fail=1
-wait $host
+kill $host; wait $host
 grep -E '^wayland|^output' $t/still.log
 grep -q 'org_kde_plasma_window_management yes' $t/still.log && grep -q 'window rules from org_kde_plasma_window_management' $t/still.log \
   || { echo "kde: org_kde_plasma_window_management not bound  FAIL"; fail=1; }
@@ -93,13 +107,14 @@ note "2b. a split output: a host per region"
 wp2=/src/Tests/scenes/images
 PHOTON_WARMUP=0 photon-linux render $wp $t/split-l.png 2 640 720 > /dev/null 2>&1
 PHOTON_WARMUP=0 photon-linux render $wp2 $t/split-r.png 2 640 720 > /dev/null 2>&1
-photon-linux desktop $wp --backend wayland --seconds 4 --fps 2 --still --time 2 --hold 4 --no-sound --region Virtual-0=0,0,640,720 \
+photon-linux desktop $wp --backend wayland --seconds 60 --fps 2 --still --time 2 --hold 60 --no-sound --region Virtual-0=0,0,640,720 \
   > $t/split-l.log 2>&1 & h1=$!
-photon-linux desktop $wp2 --backend wayland --seconds 4 --fps 2 --still --time 2 --hold 4 --no-sound --region Virtual-0=640,0,640,720 \
+photon-linux desktop $wp2 --backend wayland --seconds 60 --fps 2 --still --time 2 --hold 60 --no-sound --region Virtual-0=640,0,640,720 \
   > $t/split-r.log 2>&1 & h2=$!
-sleep 6
+ready $t/split-l.log || fail=1
+ready $t/split-r.log || fail=1
 python3 /scripts/in-container/kwin_screenshot.py Virtual-0 $t/split.png || fail=1
-wait $h1 $h2
+kill $h1 $h2; wait $h1 $h2
 grep -h '^output' $t/split-l.log $t/split-r.log
 python3 -c "import sys; from PIL import Image; i = Image.open(sys.argv[1]).convert('RGB'); i.crop((0, 0, 640, 720)).save(sys.argv[2]); i.crop((640, 0, 1280, 720)).save(sys.argv[3])" \
   $t/split.png $t/split-l-shot.png $t/split-r-shot.png
@@ -107,12 +122,13 @@ same $t/split-l.png $t/split-l-shot.png "Virtual-0 left region vs headless 640x7
 same $t/split-r.png $t/split-r-shot.png "Virtual-0 right region vs headless 640x720" || fail=1
 
 note "3. fullscreen on Virtual-1, then maximized"
-photon-linux desktop $wp --backend wayland --seconds 13 --fps 10 --fullscreen pause --maximized pause --no-sound > $t/rules.log 2>&1 & host=$!
-sleep 3
+photon-linux desktop $wp --backend wayland --seconds 90 --fps 10 --fullscreen pause --maximized pause --no-sound > $t/rules.log 2>&1 & host=$!
+ready $t/rules.log || fail=1
 photon-linux desktop --wl-test-client fullscreen --output Virtual-1 --seconds 3 > $t/client-fs.log 2>&1
-sleep 2
+waitfor $t/rules.log 'resumed' 1 || fail=1
 photon-linux desktop --wl-test-client maximized --seconds 3 > $t/client-max.log 2>&1
-wait $host
+waitfor $t/rules.log 'resumed' 2 10
+kill $host; wait $host
 grep '^playback' $t/rules.log
 python3 - $t/rules.log <<'PY' || fail=1
 import sys
@@ -137,10 +153,11 @@ PY
 
 note "4. an application rule by app_id"
 rules='[{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FD","application":"mygame","condition":3,"action":1}]'
-photon-linux desktop $wp --backend wayland --seconds 8 --fps 10 --fullscreen pause --no-sound --app-rules "$rules" > $t/rule.log 2>&1 & host=$!
-sleep 2.5
+photon-linux desktop $wp --backend wayland --seconds 90 --fps 10 --fullscreen pause --no-sound --app-rules "$rules" > $t/rule.log 2>&1 & host=$!
+ready $t/rule.log || fail=1
 photon-linux desktop --wl-test-client fullscreen --output Virtual-0 --app-id org.example.mygame --seconds 3 > /dev/null 2>&1
-wait $host
+waitfor $t/rule.log 'playback: unmute' 1 10
+kill $host; wait $host
 grep '^playback' $t/rule.log
 grep -q 'playback: mute' $t/rule.log && ! grep -q 'paused (fullscreen)' $t/rule.log \
   && echo "kde: the fullscreen app_id org.example.mygame mutes through its rule" || { echo "kde: app rule  FAIL"; fail=1; }
@@ -151,12 +168,17 @@ vdm org.kde.KWin.VirtualDesktopManager.createDesktop 1 Two > /dev/null
 ids=$(vdm org.freedesktop.DBus.Properties.Get org.kde.KWin.VirtualDesktopManager desktops | grep -o "'[0-9a-f-]\{36\}'" | tr -d "'")
 one=$(echo "$ids" | sed -n 1p); two=$(echo "$ids" | sed -n 2p)
 echo "kde: desktops $one $two"
-photon-linux desktop $wp --backend wayland --seconds 10 --fps 10 --fullscreen run --maximized pause --no-sound > $t/desktops.log 2>&1 & host=$!
-sleep 2
-photon-linux desktop --wl-test-client maximized --seconds 7 > /dev/null 2>&1 & client=$!
-sleep 2.5; vdm org.freedesktop.DBus.Properties.Set org.kde.KWin.VirtualDesktopManager current "<'$two'>" > /dev/null
-sleep 2; vdm org.freedesktop.DBus.Properties.Set org.kde.KWin.VirtualDesktopManager current "<'$one'>" > /dev/null
-wait $client; wait $host
+photon-linux desktop $wp --backend wayland --seconds 90 --fps 10 --fullscreen run --maximized pause --no-sound > $t/desktops.log 2>&1 & host=$!
+ready $t/desktops.log || fail=1
+photon-linux desktop --wl-test-client maximized --seconds 30 > /dev/null 2>&1 & client=$!
+waitfor $t/desktops.log 'paused' 1 || fail=1
+vdm org.freedesktop.DBus.Properties.Set org.kde.KWin.VirtualDesktopManager current "<'$two'>" > /dev/null
+waitfor $t/desktops.log 'resumed' 1 10
+vdm org.freedesktop.DBus.Properties.Set org.kde.KWin.VirtualDesktopManager current "<'$one'>" > /dev/null
+waitfor $t/desktops.log 'paused' 2 10
+kill $client; wait $client
+waitfor $t/desktops.log 'resumed' 2 10
+kill $host; wait $host
 grep '^playback' $t/desktops.log
 [ "$(grep -c 'Virtual-0 paused' $t/desktops.log)" = 2 ] && [ "$(grep -c 'Virtual-0 resumed' $t/desktops.log)" = 2 ] \
   && echo "kde: a maximized window on another virtual desktop does not pause" || { echo "kde: virtual desktops  FAIL"; fail=1; }

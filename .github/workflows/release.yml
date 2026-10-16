@@ -24,14 +24,17 @@ jobs:
 
   macos-app:
     name: macOS app (universal)
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - name: Version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: Build tools
-        run: brew install ninja
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          swift --version
+          brew install ninja
       # Static universal glslangValidator and spirv-cross (same versions as the Flatpak), cached by the script.
       - uses: actions/cache@v6
         with:

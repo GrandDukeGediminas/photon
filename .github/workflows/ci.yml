@@ -21,12 +21,14 @@ concurrency:
 jobs:
   macos:
     name: macOS build and tests
-    runs-on: macos-15
+    # Swift 6.2 or later (the Linux image's toolchain; macos-15 defaults to Xcode 16.4 / Swift 6.1).
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - name: Tools
         run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
           brew install glslang spirv-cross
           swift --version
       - name: swift build (debug)
@@ -108,8 +110,13 @@ jobs:
         run: scripts/linux/package.sh --no-test
       # info, self-tests, text shaping against CoreText, the CC0 scenes (byte-identical to Tests/scenes/refs/<arch>
       # when the image's Mesa is the one the references were made with), the GTK app under Xvfb and sway.
+      # Stripped like the copy in the packages (package-build.sh): KWin's per-client check takes longer the larger the
+      # executable, so the KDE check runs what users get.
       - name: Hosted checks (the packaged binary)
-        run: PHOTON_LX_BUILD=$RUNNER_TEMP/lx-build/static scripts/linux/ci-hosted.sh release --no-build
+        run: |
+          export PHOTON_LX_BUILD=$RUNNER_TEMP/lx-build/static
+          . scripts/linux/env.sh && lx "strip /build/release/photon-linux"
+          scripts/linux/ci-hosted.sh release --no-build
       # Fresh ubuntu:24.04 and fedora:40 containers: apt / dnf install, dpkg -i / rpm -i, ldd, info, self-test,
       # sound-check against the bundled OpenAL, the CC0 scenes.
       - name: Install tests
