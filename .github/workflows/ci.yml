@@ -31,8 +31,15 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_26.6.app
           brew install glslang spirv-cross
           swift --version
+      # Compiler errors are repeated as annotations, which the run page shows without opening the log.
       - name: swift build (debug)
-        run: swift build
+        run: |
+          set -o pipefail
+          swift build 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E '^/.*:[0-9]+:[0-9]+: error: ' "$RUNNER_TEMP/build.log" | sort -u | head -40 |
+              sed -E "s#^$PWD/([^:]+):([0-9]+):([0-9]+): error: (.*)#::error file=\1,line=\2,col=\3::\4#"
+            exit 1
+          }
       - name: swift build (release)
         run: swift build -c release
       - name: swift test
