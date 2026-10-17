@@ -161,6 +161,13 @@ package final class SteamLogin: ObservableObject {
     package weak var queue: DownloadQueue?
     private var process: SteamCmdProcess?
     private var buffer = ""
+    /// steamcmd's last non-empty line, quoted when it stops for a reason photon doesn't recognise.
+    private var lastLine: String?
+
+    /// While steamcmd waits for the sign-in to be approved in the Steam Mobile app (Steam Guard mobile authenticator).
+    package static let approveMessage = "Approve the sign-in in the Steam Mobile app on your phone…"
+    /// steamcmd gave up waiting for that approval (about a minute) and stopped.
+    package static let approvalTimedOut = "The sign-in wasn't approved in the Steam Mobile app in time. Try again and approve it on your phone."
 
     package init() {}
 
@@ -174,6 +181,7 @@ package final class SteamLogin: ObservableObject {
         guard let exe = executable() else { return state = .failed("steamcmd isn't set up yet") }
         if queue?.isBusy == true { return state = .failed("Wait for the current download to finish") }
         buffer = ""
+        lastLine = nil
         codeRefused = false
         state = .working("Starting steamcmd…")
         queue?.held = true
@@ -229,6 +237,17 @@ package final class SteamLogin: ObservableObject {
             line = String(line[r.lowerBound...])
         }
         let lower = line.lowercased()
+        if complete, !line.isEmpty { lastLine = line }
+        if lower.contains("timed out waiting for confirmation") {
+            state = .failed(Self.approvalTimedOut)
+            return
+        }
+        // "Please confirm the login in the Steam Mobile app on your phone." then "Waiting for confirmation..." with no
+        // line end until it is approved.
+        if lower.contains("confirm the login in the steam mobile app") || lower.hasPrefix("waiting for confirmation") {
+            if lower.hasSuffix("ok") { state = .working("Signing in…") } else if state != .signedIn { state = .working(Self.approveMessage) }
+            return
+        }
         if lower.hasSuffix("password:") {
             if !complete { buffer = "" }
             // A second password prompt means the first was wrong.
@@ -269,8 +288,15 @@ package final class SteamLogin: ObservableObject {
         switch state {
         case .signedIn, .failed: break
         case .needsPassword, .needsCode: state = .failed("steamcmd stopped before signing in")
-        default: state = .failed(status == 0 ? "steamcmd stopped without signing in" : "steamcmd stopped (status \(status))")
+        case .working(Self.approveMessage): state = .failed(Self.approvalTimedOut)
+        default: state = .failed(Self.stopped(status: status, lastLine: lastLine))
         }
+    }
+
+    /// Why sign-in failed when steamcmd stopped without a reason photon recognises: its status and last line.
+    package static func stopped(status: Int32, lastLine: String?) -> String {
+        if status == 0 { return "steamcmd stopped without signing in" }
+        return "steamcmd stopped (status \(status))" + (lastLine.map { ": \($0.prefix(200))" } ?? "")
     }
 
     /// steamcmd's refusal reasons in words.

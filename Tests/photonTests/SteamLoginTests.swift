@@ -65,6 +65,33 @@ final class SteamLoginTests: XCTestCase {
         XCTAssertEqual(l.state, .signedIn)
     }
 
+    func testApprovedInTheMobileApp() {
+        let l = login()
+        l.start(username: "phone")
+        waitFor(l) { $0 == .needsPassword }
+        l.submitPassword("right")
+        waitFor(l) { $0 == .working(SteamLogin.approveMessage) }
+        XCTAssertEqual(l.state, .working(SteamLogin.approveMessage), "says where to look while steamcmd waits")
+        waitFor(l) { $0 == .signedIn }
+        XCTAssertEqual(l.state, .signedIn)
+    }
+
+    func testNotApprovedInTime() {
+        let l = login()
+        l.start(username: "phoneslow")
+        waitFor(l) { $0 == .needsPassword }
+        l.submitPassword("right")
+        waitFor(l) { _ in !l.isRunning }
+        XCTAssertEqual(l.state, .failed(SteamLogin.approvalTimedOut))
+    }
+
+    func testUnexplainedExitQuotesSteamcmd() {
+        XCTAssertEqual(SteamLogin.stopped(status: 5, lastLine: "ERROR (Service Unavailable)"),
+                       "steamcmd stopped (status 5): ERROR (Service Unavailable)")
+        XCTAssertEqual(SteamLogin.stopped(status: 5, lastLine: nil), "steamcmd stopped (status 5)")
+        XCTAssertEqual(SteamLogin.stopped(status: 0, lastLine: nil), "steamcmd stopped without signing in")
+    }
+
     func testCancelAtPasswordPrompt() {
         let l = login()
         l.start(username: "plain")

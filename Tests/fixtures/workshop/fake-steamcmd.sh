@@ -10,7 +10,8 @@
 # +licenses_for_app 431960 (the ownership check): user "nologin" gets the login prompt, "noowner" logs in with no
 # licence for the app, "expired" has an expired one; anyone else owns it.
 # +login <user> +quit alone (the sign-in): prompts "password: " on stdin (correct: "right"); user "email" then asks for a
-# "Steam Guard code:" and "app" for a "Two-factor code:" (correct: "GOOD1"; a wrong code is refused and asked again).
+# "Steam Guard code:" and "app" for a "Two-factor code:" (correct: "GOOD1"; a wrong code is refused and asked again);
+# "phone" waits for approval in the Steam Mobile app and gets it, "phoneslow" times out waiting (exit 5, as steamcmd).
 # The arguments are written to $FAKE_ARGS (one per line) when set.
 [ -n "$FAKE_ARGS" ] && printf '%s\n' "$@" >> "$FAKE_ARGS"
 id=""
@@ -53,6 +54,18 @@ if [ -n "$login_only" ]; then
         [ "$code" = "GOOD1" ] && break
         [ "$user" = email ] && echo "That Steam Guard code was invalid." || echo "Two-factor code mismatch"
       done
+      ;;
+    phone|phoneslow)
+      echo "This account is protected by a Steam Guard mobile authenticator."
+      echo "Please confirm the login in the Steam Mobile app on your phone."
+      echo
+      printf "Waiting for confirmation..."
+      sleep 0.3
+      if [ "$user" = phoneslow ]; then
+        printf "\nTimed out waiting for confirmation.\n"
+        exit 5
+      fi
+      echo "OK"
       ;;
   esac
   printf "Logging in user '%s' [U:1:1] to Steam Public...OK\n" "$user"
