@@ -92,7 +92,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self, status == .notOwned else { return }
             let alert = NSAlert()
             alert.messageText = "Wallpaper Engine isn't owned by this Steam account"
-            alert.informativeText = "photon runs only for a Steam account that owns Wallpaper Engine. photon will quit."
+            alert.informativeText = "photon requires a Steam account that owns Wallpaper Engine: its wallpapers come from "
+                + "Wallpaper Engine's Steam Workshop, and owning it supports the original developers. photon will quit."
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
             NSApp.terminate(nil)

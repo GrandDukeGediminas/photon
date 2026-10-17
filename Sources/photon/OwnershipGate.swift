@@ -10,9 +10,10 @@ struct OwnershipGateView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("photon needs Wallpaper Engine").font(.title2.bold())
-            Text("photon runs only for a Steam account that owns Wallpaper Engine. Enter your Steam username and photon will "
-                 + "ask Steam.")
+            Text("photon requires Wallpaper Engine").font(.title2.bold())
+            Text("photon requires a Steam account that owns Wallpaper Engine. Its wallpapers come from Wallpaper Engine's "
+                 + "Steam Workshop, and owning it supports the original developers. Enter your Steam username and photon "
+                 + "will ask Steam.")
                 .fixedSize(horizontal: false, vertical: true)
             TextField("Steam username", text: $workshop.username)
                 .textFieldStyle(.roundedBorder)

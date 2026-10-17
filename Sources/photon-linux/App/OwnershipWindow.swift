@@ -28,9 +28,10 @@ final class OwnershipWindow {
         let root = box(true, spacing: 10)
         margins(root, 18)
         gtk_container_add(G(window), root)
-        pack(root, label("photon needs Wallpaper Engine", css: "photon-section"))
-        pack(root, label("photon runs only for a Steam account that owns Wallpaper Engine. It asks Steam through steamcmd, "
-                         + "using the login steamcmd saved; photon never sees your password.", wrap: true))
+        pack(root, label("photon requires Wallpaper Engine", css: "photon-section"))
+        pack(root, label("photon requires a Steam account that owns Wallpaper Engine. Its wallpapers come from Wallpaper "
+                         + "Engine's Steam Workshop, and owning it supports the original developers. photon asks Steam "
+                         + "through steamcmd, using the login steamcmd saved; photon never sees your password.", wrap: true))
         entry = gtk_entry_new()!
         gtk_entry_set_placeholder_text(G(entry), "Steam username")
         gtk_entry_set_text(G(entry), app.state.workshop.username)
