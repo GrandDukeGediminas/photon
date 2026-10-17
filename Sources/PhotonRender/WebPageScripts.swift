@@ -122,10 +122,62 @@ public enum WebPageScripts {
     })();
     """
 
-    /// The scripts injected at document start in the main frame, in order: the engine's runtime (when the install has
-    /// it), the bindings, the LED plugin, the console hook (`PHOTON_WEBDEBUG=1`).
-    public static func userScripts(engineInstall: URL?) -> [String] {
-        var s: [String] = []
+    /// photon's frame-rate cap for web pages (an energy control; the engine has none: webwallpaper64 creates a windowed
+    /// CEF browser without `windowless_frame_rate` and ignores the `fps` setting, docs/re/09 §6). `requestAnimationFrame`
+    /// callbacks are batched and released at most `fps` times a second (0 = every display frame), with the wait between
+    /// batches spent in a timer, so a capped page does not wake on every display refresh.
+    /// It is installed before the engine's runtime, which keeps the `requestAnimationFrame` it finds (`var RAF`) for
+    /// its pause queue. `setFrameRate` changes the cap of a loaded page.
+    public static let frameLimiter = """
+    (function() {
+      if (window.___photonFrameLimit) return;
+      var raf = window.requestAnimationFrame.bind(window), timeout = window.setTimeout.bind(window);
+      var limit = window.___photonFrameLimit = { fps: 0 };
+      var callbacks = new Map(), nextID = 0, scheduled = false, last = -1;
+      function flush(t) {
+        scheduled = false;
+        var interval = limit.fps > 0 ? 1000 / limit.fps : 0;
+        if (interval > 0 && last >= 0) {
+          var wait = last + interval - t;
+          if (wait > 1) { schedule(wait); return; }
+          // Keep the cadence (60 fps on a 120 Hz display is every other frame) unless a frame was missed.
+          last = t - last < 2 * interval ? last + interval : t;
+        } else {
+          last = t;
+        }
+        var run = callbacks;
+        callbacks = new Map();
+        run.forEach(function(fn) { try { fn(t); } catch (e) { timeout(function() { throw e; }, 0); } });
+      }
+      function schedule(wait) {
+        scheduled = true;
+        // Sleep until shortly before the frame is due, then wait for the display frame.
+        if (wait > 6) { timeout(function() { raf(flush); }, wait - 6); } else { raf(flush); }
+      }
+      window.requestAnimationFrame = function(fn) {
+        var id = ++nextID;
+        callbacks.set(id, fn);
+        if (!scheduled) schedule(0);
+        return id;
+      };
+      window.cancelAnimationFrame = function(id) { callbacks.delete(id); };
+      if (window.webkitRequestAnimationFrame) {
+        window.webkitRequestAnimationFrame = window.requestAnimationFrame;
+        window.webkitCancelAnimationFrame = window.cancelAnimationFrame;
+      }
+    })();
+    """
+
+    /// Changes the frame-rate cap of a loaded page (0 = unlimited).
+    public static func setFrameRate(_ fps: Int) -> String {
+        "if(window.___photonFrameLimit){window.___photonFrameLimit.fps=\(max(fps, 0));}"
+    }
+
+    /// The scripts injected at document start in the main frame, in order: the frame limiter (capped at `fps` from the
+    /// start), the engine's runtime
+    /// (when the install has it), the bindings, the LED plugin, the console hook (`PHOTON_WEBDEBUG=1`).
+    public static func userScripts(engineInstall: URL?, fps: Int = 0) -> [String] {
+        var s: [String] = [frameLimiter + setFrameRate(fps)]
         if let runtime = engineInstall.flatMap(engineRuntime) { s.append(runtime) }
         s.append(bindings)
         if pluginsEnabled { s.append(ledPlugin) }

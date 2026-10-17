@@ -59,10 +59,12 @@ rarch=$(docker run --rm $platform "$tools" uname -m)
 # shellcheck disable=SC2086
 darch=$(docker run --rm $platform "$tools" dpkg --print-architecture)
 
+. "$repo/scripts/linux/in-container/ci-lib.sh"
 # install_test <image> <package file name> <name> [report [docker args]]: with "report" the renders are compared but not
 # gated (another distribution's Mesa: lavapipe differs between Mesa releases).
 install_test() {
   rm -rf "${tests:?}/$3"
+  docker_pull "$1" "$platform" || { fail=1; return; }
   # shellcheck disable=SC2086
   docker run --rm $platform $5 -v "$pkg":/pkg:ro -v "$repo":/src:ro -v "$tests":/out "$1" \
     sh /src/scripts/linux/in-container/package-install-test.sh "/pkg/$2" "/out/$3" /out/default-hrtf-1.21.1.mhr \

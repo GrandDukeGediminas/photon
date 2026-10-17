@@ -159,6 +159,8 @@ package struct HostFlags: OptionSet {
     package static let userMute = HostFlags(rawValue: 1 << 6)      // 0x14006ed70
     package static let vramExhausted = HostFlags(rawValue: 1 << 10) // `pausevram` (0x14006d397)
     package static let screensaver = HostFlags(rawValue: 1 << 22)  // WM_COPYDATA 1014 from the screensaver (0x1400237b1)
+    /// photon only (Energy.swift): critical thermal pressure with the heat back-off on pauses every wallpaper.
+    package static let overheated = HostFlags(rawValue: 1 << 30)
 }
 
 package enum PlaybackEvaluator {
@@ -203,6 +205,7 @@ package enum PlaybackEvaluator {
         }
         if flags.contains(.peek) { mask = 0 }
         if flags.contains(.screensaver) { mask = all }
+        if flags.contains(.overheated) { mask = all }
         if flags.contains(.onBattery) {
             if settings.battery == .stop { stop = true } else if settings.battery == .pause { mask = all }
         }

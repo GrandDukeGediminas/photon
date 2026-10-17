@@ -72,12 +72,30 @@ package final class AppState: ObservableObject {
     /// Host state the rules read (battery, sleep, screensaver, VRAM) and the current automatic decision.
     @Published package var hostFlags: HostFlags = []
     @Published package var decision = PlaybackDecision()
-    /// The engine's `fps` setting (default 15): frame cap, particle half-steps, audio poll period.
+    /// The engine's `fps` setting (default 15): frame cap, particle half-steps, audio poll period. What the renderers use
+    /// is `energy.fps`, this setting after the energy controls.
     @Published package var fps: Int {
         didSet {
             defaults.set(fps, forKey: "fps")
-            SceneRenderer.fpsSetting = fps
+            updateEnergy()
         }
+    }
+    /// photon's energy controls (Energy.swift): battery frame rate, Low Power Mode, heat back-off.
+    @Published package var energySettings: EnergySettings {
+        didSet { energySettings.save(to: defaults); updateEnergy() }
+    }
+    /// The power probes' last reading (the playback monitor sets it every `windowupdaterate` tick).
+    @Published package var energyInputs = EnergyInputs() {
+        didSet { if energyInputs != oldValue { updateEnergy() } }
+    }
+    /// The frame rate in use and why. `SceneRenderer.fpsSetting` follows it, so the particle half-steps and the audio
+    /// poll period see the rate the wallpapers actually run at, as if the user had set it.
+    @Published package private(set) var energy = EnergyState(fps: 15)
+
+    private func updateEnergy() {
+        let e = EnergyPolicy.evaluate(fps: fps, settings: energySettings, inputs: energyInputs)
+        SceneRenderer.fpsSetting = e.fps
+        if e != energy { energy = e }
     }
     /// The engine's post-processing quality: disabled turns bloom off, ultra enables the HDR path.
     @Published package var postProcessing: SceneRenderer.PostProcessing {
@@ -189,8 +207,8 @@ package final class AppState: ObservableObject {
         // Environment PHOTON_FPS wins (SceneRenderer reads it at startup), then the saved setting, then 15.
         let fpsValue = ProcessInfo.processInfo.environment["PHOTON_FPS"] != nil ? SceneRenderer.fpsSetting
             : (ud.object(forKey: "fps") as? Int ?? SceneRenderer.fpsSetting)
+        energySettings = EnergySettings(defaults: ud)
         fps = fpsValue
-        SceneRenderer.fpsSetting = fpsValue
         layout = min(max(defaults.integer(forKey: "layout"), 0), 2)
         var p = defaults.data(forKey: "profile").map { MonitorProfile(json: try? JSONSerialization.jsonObject(with: $0)) } ?? MonitorProfile()
         if defaults.object(forKey: "profile") == nil, let old = defaults.stringArray(forKey: "cloneflip") { p.flip = Set(old) } // before profiles
@@ -203,6 +221,7 @@ package final class AppState: ObservableObject {
         SceneRenderer.postProcessing = postProcessing
         Multisample.setting = msaa
         SceneRenderer.resolutionSetting = resolution
+        updateEnergy() // observers don't run during init
         reloadLibrary()
         workshop = WorkshopController(state: self, defaults: defaults)
         playlists = PlaylistController(state: self)
@@ -245,7 +264,7 @@ package final class AppState: ObservableObject {
     /// The general settings object web wallpapers receive in `applyGeneralProperties` (CEFWallpaper 0x140119a60 sends the
     /// user's whole general settings; the web host maps `language`). Only the settings photon has are included.
     package var generalSettingsForWeb: [String: Any] {
-        ["fps": fps, "language": "en-us", "postprocessing": postProcessing.rawValue,
+        ["fps": energy.fps, "language": "en-us", "postprocessing": postProcessing.rawValue,
          "playbackfocus": playback.focus.engineString, "playbackmaximized": playback.maximized.engineString,
          "playbackfullscreen": playback.fullscreen.engineString, "playbackonbattery": playback.battery.engineString,
          "playbacksleep": playback.sleep.engineString, "playbackaudio": playback.audio.engineString]

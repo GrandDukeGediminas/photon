@@ -144,6 +144,7 @@ final class HostSupervisor {
                  "--postprocessing", state.postProcessing.rawValue, "--window-update-rate", String(pb.windowUpdateRate),
                  "--focus", pb.focus.engineString, "--maximized", pb.maximized.engineString, "--fullscreen", pb.fullscreen.engineString,
                  "--battery", pb.battery.engineString, "--sleep", pb.sleep.engineString, "--audio", pb.audio.engineString]
+            + EnergyOptions.arguments(state.energySettings)
         if !state.rules.isEmpty, let d = try? JSONEncoder().encode(state.rules) { a += ["--app-rules", String(decoding: d, as: UTF8.self)] }
         if pb.pauseOnVRAMExhaustion { a.append("--pause-vram") }
         if ProcessInfo.processInfo.environment["PHOTON_HOST_ARGS"].map({ !$0.isEmpty }) == true {

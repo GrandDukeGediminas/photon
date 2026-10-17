@@ -98,6 +98,8 @@ final class SceneHost {
     private(set) var kind: ProjectKind
     let rules: DesktopRuleState
     let layout: Int
+    /// Frames per second for the host loop: the frame rate in use after the energy controls (unlimited = 240).
+    var frameRate: Double { EnergyOptions.loopRate(rules.energy.fps) }
     let cloneFlip: Set<String>
     var videoAudio: VideoAudio?
     var isVideoWallpaper: Bool { kind == .video }
@@ -153,6 +155,9 @@ final class SceneHost {
         self.engineAssets = engineAssets
         kind = ProjectKind.classify(file: (SceneRenderer.readProject(wallpaper)["file"] as? String) ?? "")
         rules = DesktopRuleState(settings: options.settings)
+        rules.energySettings = options.energy
+        rules.baseFPS = EnergyOptions.baseFPS(options.fps)
+        SceneRenderer.fpsSetting = rules.energy.fps
         rules.appRules = options.appRules
         layout = options.layout
         rules.layout = options.layout
@@ -350,6 +355,11 @@ final class SceneHost {
         for line in rules.tick(masks: probe.masks, inputs: inputs, monitorCount: surfaces.count, windows: probe.windows, app: app,
                                vram: vramReading(real: false)) {
             print("playback: \(line)")
+        }
+        // The renderer's `fps` setting (particle half-steps, audio poll period) follows the rate in use.
+        if SceneRenderer.fpsSetting != rules.energy.fps {
+            SceneRenderer.fpsSetting = rules.energy.fps
+            AudioSystem.shared.pollPeriodMs = AudioSystem.pollPeriod(fps: rules.energy.fps)
         }
         if rules.stopped != stopped {
             stopped = rules.stopped

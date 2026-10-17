@@ -430,6 +430,8 @@ struct DesktopSystemInputs: Equatable {
     var screensaver = false
     /// Last tick's audio input (for the log only).
     var otherAudio = false
+    /// power-profiles-daemon's "power-saver" profile (the energy controls' Low Power Mode).
+    var lowPower = false
 }
 
 /// The host's playback state: settings, host flags, the lock pause and the last decision; `tick` applies the event
@@ -447,6 +449,12 @@ final class DesktopRuleState {
     var layout = 0
     /// `pausevram` hysteresis (shared with macOS, PhotonApp).
     private var vramRule = VRAMRule()
+    /// photon's energy controls (Energy.swift): `--fps`, `--battery-fps`, `--low-power`, `--cap-web`. Linux has no thermal
+    /// probe, so only the battery frame rate and the power-saver profile apply.
+    var energySettings = EnergySettings()
+    var baseFPS = 30 { didSet { energy = EnergyPolicy.evaluate(fps: baseFPS, settings: energySettings, inputs: EnergyInputs()) } }
+    /// The frame rate in use after the energy controls (updated every tick).
+    private(set) var energy = EnergyState(fps: 30)
 
     init(settings: PlaybackSettings) { self.settings = settings }
 
@@ -499,9 +507,14 @@ final class DesktopRuleState {
         // WM_COPYDATA 1014 / SPI_GETSCREENSAVERRUNNING: 0x400000 while the screensaver runs.
         if inputs.screensaver { flags.insert(.screensaver) } else { flags.remove(.screensaver) }
         if inputs.screensaver != last.screensaver { log.append("screensaver \(inputs.screensaver ? "started" : "stopped")") }
-        // GUID_ACDC_POWER_SOURCE: flag 0x10 when not on AC.
-        if inputs.onBattery { flags.insert(.onBattery) } else { flags.remove(.onBattery) }
+        // GUID_ACDC_POWER_SOURCE: flag 0x10 when not on AC; with the energy controls also in power-saver mode.
+        let e = EnergyPolicy.evaluate(fps: baseFPS, settings: energySettings,
+                                      inputs: EnergyInputs(onBattery: inputs.onBattery, lowPower: inputs.lowPower))
+        if e.saving { flags.insert(.onBattery) } else { flags.remove(.onBattery) }
         if inputs.onBattery != last.onBattery { log.append(inputs.onBattery ? "on battery" : "on AC power") }
+        if inputs.lowPower != last.lowPower { log.append(inputs.lowPower ? "power-saver profile" : "power-saver profile off") }
+        if e != energy { log.append("energy: \(e.summary)") }
+        energy = e
         last = inputs
         last.otherAudio = app.otherAudio
         // While asleep the engine keeps the previous pause state (0x14006d45b); a stop decided by sleep stays.
@@ -560,6 +573,19 @@ final class DesktopRuleState {
         check(b.stopped, "battery stop")
         b.tick(masks: none, inputs: DesktopSystemInputs(), monitorCount: 1)
         check(!b.stopped, "AC power resumes")
+        // Energy controls: the battery frame rate, and power-saver counting as battery for the battery rule.
+        var ps = PlaybackSettings(); ps.battery = .pause
+        let en = DesktopRuleState(settings: ps)
+        en.baseFPS = 60
+        en.tick(masks: none, inputs: DesktopSystemInputs(), monitorCount: 1)
+        check(en.energy.fps == 60 && !en.outputPaused(0), "on AC the frame rate is the setting")
+        en.tick(masks: none, inputs: DesktopSystemInputs(onBattery: true), monitorCount: 1)
+        check(en.energy.fps == 30 && en.outputPaused(0), "battery: 30 fps and the battery rule")
+        en.tick(masks: none, inputs: DesktopSystemInputs(lowPower: true), monitorCount: 1)
+        check(en.energy.fps == 30 && en.outputPaused(0), "power-saver counts as battery")
+        en.energySettings.followLowPower = false
+        en.tick(masks: none, inputs: DesktopSystemInputs(lowPower: true), monitorCount: 1)
+        check(en.energy.fps == 60 && !en.outputPaused(0), "power-saver ignored when not followed")
         // pausevram: 80 % stops; under 75 % only after 15 s; under 35 % at once.
         var vs = PlaybackSettings(); vs.pauseOnVRAMExhaustion = true
         let v = DesktopRuleState(settings: vs)

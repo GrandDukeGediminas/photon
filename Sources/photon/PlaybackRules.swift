@@ -64,13 +64,21 @@ final class PlaybackMonitor {
         distributed.append(dc.addObserver(forName: Notification.Name("com.apple.screensaver.didstop"), object: nil, queue: .main) { [weak self] _ in
             self?.state?.hostFlags.remove(.screensaver); self?.evaluate()
         })
+        // Energy controls (Energy.swift): react to Low Power Mode and heat right away, not only on the next tick.
+        let nc = NotificationCenter.default
+        observers.append(nc.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.evaluate()
+        })
+        observers.append(nc.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.evaluate()
+        })
         restartTimer()
         evaluate()
     }
 
     deinit {
         timer?.invalidate()
-        observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0); NotificationCenter.default.removeObserver($0) }
         distributed.forEach { DistributedNotificationCenter.default().removeObserver($0) }
     }
 
@@ -96,7 +104,10 @@ final class PlaybackMonitor {
     func evaluate() {
         guard let state else { return }
         var flags = state.hostFlags
-        if Self.onBattery { flags.insert(.onBattery) } else { flags.remove(.onBattery) }
+        state.energyInputs = Self.energyInputs
+        // The battery rule also covers Low Power Mode when the energy settings say so; heat can pause everything.
+        if state.energy.saving { flags.insert(.onBattery) } else { flags.remove(.onBattery) }
+        if state.energy.overheated { flags.insert(.overheated) } else { flags.remove(.overheated) }
         if state.playback.pauseOnVRAMExhaustion { updateVRAM(&flags) } else { flags.remove(.vramExhausted) }
         if flags != state.hostFlags { state.hostFlags = flags }
         // While asleep the engine skips the pause update (0x14006d45b); a stop decided by sleep stays.
@@ -113,6 +124,17 @@ final class PlaybackMonitor {
         guard let device = MTLCreateSystemDefaultDevice() else { return }
         let budget = Double(device.recommendedMaxWorkingSetSize), used = Double(device.currentAllocatedSize)
         if let line = vram.update(used: used, budget: budget, flags: &flags) { NSLog("photon: %@", line) }
+    }
+
+    static var energyInputs: EnergyInputs {
+        let thermal: ThermalLevel
+        switch ProcessInfo.processInfo.thermalState {
+        case .fair: thermal = .fair
+        case .serious: thermal = .serious
+        case .critical: thermal = .critical
+        default: thermal = .nominal
+        }
+        return EnergyInputs(onBattery: onBattery, lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled, thermal: thermal)
     }
 
     static var onBattery: Bool {

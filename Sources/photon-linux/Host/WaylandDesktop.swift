@@ -372,7 +372,7 @@ final class WaylandDesktopHost {
             }
             updatePointer()
             try host.frame(outputs, now: t)
-            let interval = 1 / max(host.switching ? max(options.fps, 60) : options.fps, 1)
+            let interval = 1 / max(host.switching ? max(host.frameRate, 60) : host.frameRate, 1)
             nextFrame = max(nextFrame.addingTimeInterval(interval), Date())
             // Wait for the next frame while handling Wayland events (configure, hotplug, toplevel states, the pointer).
             while true {
@@ -479,6 +479,7 @@ extension DesktopSystemInputs {
         photon_system_state_get(&st)
         var i = DesktopSystemInputs()
         i.onBattery = st.upower != 0 ? st.on_battery != 0 : DesktopPower.onBattery()
+        i.lowPower = st.power_saver != 0
         i.locked = st.locked != 0
         i.preparingSleep = st.preparing_sleep != 0
         i.screensaver = st.screensaver != 0

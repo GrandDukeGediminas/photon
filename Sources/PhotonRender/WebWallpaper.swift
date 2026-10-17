@@ -33,6 +33,8 @@ public final class WebWallpaper: NSObject, WKNavigationDelegate, WKScriptMessage
     private var userDirectories: [String: (url: URL, mode: String, fileType: String)] = [:]
     private var paused = false
     private var muted = false
+    /// The frame-rate cap (`WebPageScripts.frameLimiter`), applied again after each load.
+    private var frameRate = 0
     /// The page registered an audio listener (`AudioContextRegistered`, sent by the render process when
     /// `wallpaperRegisterAudioListener` stored a callback, 0x140014b91); the CEF wallpaper only streams audio after that.
     public private(set) var audioRequested = false
@@ -42,7 +44,8 @@ public final class WebWallpaper: NSObject, WKNavigationDelegate, WKScriptMessage
 
     /// `directory` is the wallpaper folder, `file` its project `file`; `properties` are the current user values.
     /// `properties` maps each property name to its value, or to a full property object (`type`, `value`, …).
-    public init(directory: URL, file: String, properties: [String: Any], engineInstall: URL?, frame: CGRect) throws {
+    /// `frameRate` caps the page's animation frames from the start (0 = every display frame; `setFrameRate` changes it).
+    public init(directory: URL, file: String, properties: [String: Any], engineInstall: URL?, frame: CGRect, frameRate: Int = 0) throws {
         if file.hasPrefix("http://") || file.hasPrefix("https://"), let u = URL(string: file) {
             pageURL = u
         } else {
@@ -55,7 +58,8 @@ public final class WebWallpaper: NSObject, WKNavigationDelegate, WKScriptMessage
         config.mediaTypesRequiringUserActionForPlayback = []
         let content = WKUserContentController()
         // The engine's runtime, the bindings, the LED plugin and the console hook (WebPageScripts, shared with Linux).
-        for script in WebPageScripts.userScripts(engineInstall: engineInstall) {
+        self.frameRate = max(frameRate, 0)
+        for script in WebPageScripts.userScripts(engineInstall: engineInstall, fps: self.frameRate) {
             content.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         config.userContentController = content
@@ -130,6 +134,7 @@ public final class WebWallpaper: NSObject, WKNavigationDelegate, WKScriptMessage
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loaded = true
+        run(WebPageScripts.setFrameRate(frameRate))
         run(WebPageScripts.applyGeneral(generalSettings))
         run(WebPageScripts.applyUser(properties))
         for (name, d) in userDirectories where d.mode.lowercased() == "fetchall" {
@@ -164,6 +169,13 @@ public final class WebWallpaper: NSObject, WKNavigationDelegate, WKScriptMessage
         typealias SetMuted = @convention(c) (AnyObject, Selector, UInt) -> Void
         // WKMediaMutedState: 1 = audio muted.
         unsafeBitCast(method_getImplementation(method), to: SetMuted.self)(webView, sel, m ? 1 : 0)
+    }
+
+    /// Caps how often the page's animation frames run (0 = every display frame).
+    public func setFrameRate(_ fps: Int) {
+        guard fps != frameRate else { return }
+        frameRate = fps
+        if loaded { run(WebPageScripts.setFrameRate(fps)) }
     }
 
     public func setPaused(_ p: Bool, force: Bool = false) {

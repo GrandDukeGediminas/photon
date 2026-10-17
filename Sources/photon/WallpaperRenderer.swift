@@ -453,7 +453,8 @@ final class WallpaperRenderer: DesktopRenderer {
     /// display link runs at display rate (`fullRateChanged`) and the `fps` period is enforced here instead.
     private func paceSpriteSync(_ scene: SceneRenderer, screen: CGDirectDisplayID, time: Double, frameStart: Double, rate: Float) {
         guard slots[screen]?.scene === scene else { return }
-        let fpsNext = state.fps > 0 ? time + 1 / Double(state.fps) : 0
+        let fps = state.energy.fps
+        let fpsNext = fps > 0 ? time + 1 / Double(fps) : 0
         guard let delay = scene.spriteSheetRefreshDelay(rate: rate) else {
             slots[screen]?.spriteSync = false
             slots[screen]?.nextFrameAt = fpsNext
@@ -800,7 +801,8 @@ final class WallpaperRenderer: DesktopRenderer {
             do {
                 // A split region's page covers its region of the display.
                 let web = try WebWallpaper(directory: item.directory, file: (project["file"] as? String) ?? "", properties: props,
-                                           engineInstall: state.engineAssets.deletingLastPathComponent(), frame: regionFrames[screen] ?? view.bounds)
+                                           engineInstall: state.engineAssets.deletingLastPathComponent(), frame: regionFrames[screen] ?? view.bounds,
+                                           frameRate: state.energy.webFPS)
                 web.generalSettings = state.generalSettingsForWeb
                 web.webView.autoresizingMask = regionFrames[screen] == nil ? [.width, .height] : []
                 view.addSubview(web.webView)
@@ -832,6 +834,11 @@ final class WallpaperRenderer: DesktopRenderer {
             }
         }
         webSlots[screen] = slot
+    }
+
+    /// The web frame cap changed (setting or energy controls); scenes read theirs every frame.
+    func frameRateChanged(_ fps: Int) {
+        for slot in webSlots.values { slot.web.setFrameRate(fps) }
     }
 
     private func removeWeb(_ screen: CGDirectDisplayID) {

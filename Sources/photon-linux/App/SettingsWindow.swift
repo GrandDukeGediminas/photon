@@ -15,6 +15,7 @@ final class SettingsWindow {
     /// The settings page (unscrolled), for full-height snapshots.
     let content: Widget
     private var statusLabel: Widget?
+    private var energyLabel: Widget?
     /// Controls by setting key (self-test).
     private(set) var controls: [String: Widget] = [:]
 
@@ -157,6 +158,26 @@ final class SettingsWindow {
         let res = Combo(SettingsCatalog.resolutionOptions, selected: state.resolution) { [weak self] v in self?.state.resolution = v }
         objc_keep(res.widget, res)
         row("Texture resolution", res.widget, key: "resolution")
+
+        section("Energy")
+        let now = label(state.energy.summary)
+        energyLabel = now
+        row("Now", now)
+        let batteryFPS = gtk_spin_button_new_with_range(0, 240, 5)!
+        gtk_spin_button_set_value(G(batteryFPS), Double(state.energySettings.batteryFPS))
+        on(batteryFPS, "value-changed") { [weak self] in
+            self?.state.energySettings.batteryFPS = Int(gtk_spin_button_get_value(G(batteryFPS)))
+        }
+        row("Frame rate on battery (0 = same as limit)", batteryFPS, key: EnergySettings.batteryFPSKey)
+        let lowPower = gtk_check_button_new_with_label("Treat the power-saver profile as battery")!
+        gtk_toggle_button_set_active(G(lowPower), state.energySettings.followLowPower ? 1 : 0)
+        on(lowPower, "toggled") { [weak self] in self?.state.energySettings.followLowPower = gtk_toggle_button_get_active(G(lowPower)) != 0 }
+        pack(content, lowPower)
+        let capWeb = gtk_check_button_new_with_label("Limit web wallpapers to the frame rate")!
+        gtk_toggle_button_set_active(G(capWeb), state.energySettings.capWebPages ? 1 : 0)
+        on(capWeb, "toggled") { [weak self] in self?.state.energySettings.capWebPages = gtk_toggle_button_get_active(G(capWeb)) != 0 }
+        pack(content, capWeb)
+        note("Wallpaper Engine runs web wallpapers at the display's refresh rate; the limit applies on battery either way.")
 
         section(t("ui_settings_wallpaper_browser_transition", "Wallpaper switch"))
         let trans = Combo(SettingsCatalog.transitionOptions.map { (String($0.1), t($0.0, SettingsCatalog.transitionFallback($0.0))) },
@@ -458,6 +479,7 @@ final class SettingsWindow {
     }
 
     func refreshStatus() {
+        if let energyLabel { gtk_label_set_text(G(energyLabel), state.energy.summary) }
         guard let statusLabel else { return }
         let s = app.supervisor.status
         let running = app.supervisor.hosts.count

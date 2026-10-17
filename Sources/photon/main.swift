@@ -29,17 +29,21 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         renderer = WallpaperRenderer(device: device, state: state)
         super.init()
         host.renderer = renderer
-        host.framesPerSecond = state.fps
+        // The frame cap is the `fps` setting after the energy controls (`state.energy`).
+        host.framesPerSecond = state.energy.fps
         // Wallpaper-switch transitions run at display rate (the engine's overlay thread is not capped by `fps`).
         renderer.fullRateChanged = { [weak self] full in
             guard let self else { return }
-            self.host.framesPerSecond = full ? 0 : self.state.fps
+            self.host.framesPerSecond = full ? 0 : self.state.energy.fps
         }
-        AudioSystem.shared.pollPeriodMs = AudioSystem.pollPeriod(fps: state.fps)
-        state.$fps.dropFirst().sink { [weak self] fps in
+        AudioSystem.shared.pollPeriodMs = AudioSystem.pollPeriod(fps: state.energy.fps)
+        state.$energy.map(\.fps).removeDuplicates().dropFirst().sink { [weak self] fps in
             guard let self else { return }
             self.host.framesPerSecond = self.renderer.fullRate ? 0 : fps
             AudioSystem.shared.pollPeriodMs = AudioSystem.pollPeriod(fps: fps)
+        }.store(in: &subscriptions)
+        state.$energy.map(\.webFPS).removeDuplicates().dropFirst().sink { [weak self] fps in
+            self?.renderer.frameRateChanged(fps)
         }.store(in: &subscriptions)
         // A stop rule hides the desktop windows and frees the wallpapers; they come back when it ends.
         state.$decision.map(\.stop).removeDuplicates().sink { [weak self] stop in
@@ -112,6 +116,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.monitor?.restartTimer()
         }.store(in: &subscriptions)
         state.$playback.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.monitor?.evaluate() }
+        }.store(in: &subscriptions)
+        state.$energySettings.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.monitor?.evaluate() }
         }.store(in: &subscriptions)
         if let s = ProcessInfo.processInfo.environment["PHOTON_CYCLE"], let seconds = Double(s) {

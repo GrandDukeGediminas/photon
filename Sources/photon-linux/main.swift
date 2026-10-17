@@ -66,6 +66,8 @@ case "info":
 case "render":
     // The full renderer (PhotonRender through the Metal facade on Vulkan); on macOS builds photon-tool is the renderer.
     #if os(Linux)
+    // Line-buffered, so a log file keeps progress and errors (stderr) in the order they happened.
+    setlinebuf(stdout)
     SceneRender.main(Array(args.dropFirst()), workshop: workshop, engineAssets: engineAssets)
     #else
     fail("photon-linux render runs on Linux; on macOS use photon-tool render (or render-proto)")

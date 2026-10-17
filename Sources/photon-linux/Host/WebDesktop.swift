@@ -90,11 +90,15 @@ final class WebDesktopHost {
         var appRules: [AppRule] = []
         /// `--region NAME=X,Y,W,H`: a split region of that output (the page's window covers only the rectangle).
         var regions: [String: CGRect] = [:]
+        /// photon's energy controls (`--battery-fps`, `--low-power`, `--cap-web`; EnergyOptions).
+        var energy = EnergySettings()
     }
 
     let options: Options
     let directory: URL
     let pageURI: String
+    /// The pages' frame cap (`WebPageScripts.frameLimiter`; 0 = the display's rate).
+    private var webFPS = 0
     let properties: [String: Any]
     let userDirectories: [String: (url: URL, mode: String, fileType: String)]
     let supportsAudio: Bool
@@ -145,6 +149,8 @@ final class WebDesktopHost {
         userDirectories = WebPageScripts.userDirectories(properties)
         supportsAudio = ((project["general"] as? [String: Any])?["supportsaudioprocessing"] as? Bool) ?? false
         rules = DesktopRuleState(settings: options.settings)
+        rules.energySettings = options.energy
+        rules.baseFPS = EnergyOptions.baseFPS(Double(options.fps))
         rules.appRules = options.appRules
         guard photon_web_init() != 0 else { throw GPUError.failed("GTK cannot open a display (DISPLAY / WAYLAND_DISPLAY)") }
         let backend = String(cString: photon_web_backend())
@@ -162,7 +168,8 @@ final class WebDesktopHost {
                 }, ctx, directory.standardizedFileURL.path, p, Int32(extra.count))
             }
         }
-        for script in WebPageScripts.userScripts(engineInstall: engineInstall) { photon_web_add_user_script(web, script) }
+        webFPS = rules.energy.webFPS
+        for script in WebPageScripts.userScripts(engineInstall: engineInstall, fps: webFPS) { photon_web_add_user_script(web, script) }
         let runtime = WebPageScripts.engineRuntime(engineInstall) != nil
         print("web: WebKitGTK on \(backend)\(backend == "wayland" ? " (layer-shell)" : " (desktop-type windows)"), page \(pageURI), "
               + "engine runtime \(runtime ? "injected" : "not found (\(engineInstall.path)/distribution/bin/webwallpaper64.exe)"), "
@@ -232,6 +239,8 @@ final class WebDesktopHost {
         case 0: // PHOTON_WEB_LOADED
             guard let p = page(view) else { return }
             p.loaded = true
+            // The frame cap may have changed since the user scripts were added.
+            run(p, WebPageScripts.setFrameRate(webFPS))
             // didFinish on macOS: general settings, user properties, fetchall directories, a pause that came first.
             run(p, WebPageScripts.applyGeneral(generalSettings))
             run(p, WebPageScripts.applyUser(properties))
@@ -467,6 +476,10 @@ final class WebDesktopHost {
         let app = LinuxProcesses.appInputs(settings: rules.settings, rules: options.appRules)
         for line in rules.tick(masks: m, inputs: inputs, monitorCount: mons.count, windows: pr.windows, app: app) { print("playback: \(line)") }
         if rules.muted != wasMuted { print("playback: \(rules.muted ? "mute" : "unmute")") }
+        if rules.energy.webFPS != webFPS {
+            webFPS = rules.energy.webFPS
+            for p in pages where p.loaded { run(p, WebPageScripts.setFrameRate(webFPS)) }
+        }
         if rules.stopped != stopped {
             stopped = rules.stopped
             print("playback: \(stopped ? "stop" : "resume from stop")")
@@ -618,6 +631,7 @@ enum WebDesktopCommand {
             case "--maximized": o.settings.maximized = value().map(PlaybackAction.init(engineString:)) ?? o.settings.maximized
             case "--focus": o.settings.focus = value().map(PlaybackAction.init(engineString:)) ?? o.settings.focus
             case "--battery": o.settings.battery = value().map(PlaybackAction.init(engineString:)) ?? o.settings.battery
+            case "--battery-fps", "--low-power", "--cap-web": EnergyOptions.parse(a, value(), into: &o.energy)
             case "--sleep": o.settings.sleep = value().map(PlaybackAction.init(engineString:)) ?? o.settings.sleep
             case "--backend":
                 // GTK picks its backend from GDK_BACKEND.

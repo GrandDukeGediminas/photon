@@ -2,6 +2,7 @@
 import CGtk3
 import Combine
 import CPhotonApp
+import CPhotonSystem
 import Foundation
 import PhotonApp
 import PhotonRender
@@ -94,6 +95,20 @@ final class LinuxApp {
             on1(display, "monitor-added") { _ in refresh() }
             on1(display, "monitor-removed") { _ in refresh() }
         }
+        // The Settings window's energy line: the hosts apply the energy controls themselves, the app only reads the
+        // same power inputs to show what they do.
+        photon_system_watch_start()
+        let readPower = { [weak self] in
+            var st = photon_system_state()
+            photon_system_state_get(&st)
+            guard let self else { return }
+            let before = self.state.energy
+            self.state.energyInputs = EnergyInputs(onBattery: st.upower != 0 ? st.on_battery != 0 : DesktopPower.onBattery(),
+                                                   lowPower: st.power_saver != 0)
+            if self.state.energy != before { self.settings?.refreshStatus() }
+        }
+        readPower()
+        _ = every(2000) { readPower(); return true }
         state.playlists.start()
         supervisor.reconcile()
         if showBrowser || (state.activeIDs.isEmpty && !(tray?.visible ?? false)) { self.showBrowser() }

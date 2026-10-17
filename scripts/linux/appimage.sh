@@ -12,9 +12,11 @@ out=$PHOTON_LX_OUT/appimage; mkdir -p "$out"
 PHOTON_LX_IMAGE=$PHOTON_LX_BOOKWORM_IMAGE lx "/scripts/in-container/appimage-build.sh $version /out/appimage" || exit 1
 [ $test = 1 ] || exit 0
 arch=$(PHOTON_LX_IMAGE=$PHOTON_LX_BOOKWORM_IMAGE lx "uname -m")
+. "$repo/scripts/linux/in-container/ci-lib.sh"
 fail=0
 for img in ubuntu:24.04 fedora:40; do
   t=test-$(echo "$img" | tr -d ':.')
+  docker_pull "$img" "${PHOTON_LX_PLATFORM:+--platform $PHOTON_LX_PLATFORM}" || { fail=1; continue; }
   # shellcheck disable=SC2086
   docker run --rm ${PHOTON_LX_PLATFORM:+--platform $PHOTON_LX_PLATFORM} -v "$out":/ai -v "$repo":/src:ro "$img" \
     sh /src/scripts/linux/in-container/appimage-test.sh "/ai/photon2-$version-$arch.AppImage" "/ai/$t" || fail=1

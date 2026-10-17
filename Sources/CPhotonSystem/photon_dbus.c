@@ -173,6 +173,47 @@ static void on_upower_changed(GDBusConnection *c, const gchar *sender, const gch
     if (changed) g_variant_unref(changed);
 }
 
+static void set_power_saver(const char *profile) {
+    UPDATE(state.power_profiles = 1; state.power_saver = profile && strcmp(profile, "power-saver") == 0);
+}
+
+// power-profiles-daemon: org.freedesktop.UPower.PowerProfiles (0.20+) or the older net.hadess.PowerProfiles name, same
+// object layout.
+static const char *const power_profile_names[][2] = {
+    {"org.freedesktop.UPower.PowerProfiles", "/org/freedesktop/UPower/PowerProfiles"},
+    {"net.hadess.PowerProfiles", "/net/hadess/PowerProfiles"},
+};
+
+static void on_power_profile_changed(GDBusConnection *c, const gchar *sender, const gchar *path, const gchar *iface,
+                                     const gchar *signal, GVariant *params, gpointer data) {
+    (void)c; (void)sender; (void)path; (void)iface; (void)signal; (void)data;
+    const gchar *interface = NULL;
+    GVariant *changed = NULL;
+    g_variant_get(params, "(&s@a{sv}@as)", &interface, &changed, NULL);
+    if (interface && (strcmp(interface, power_profile_names[0][0]) == 0 || strcmp(interface, power_profile_names[1][0]) == 0)) {
+        GVariant *v = g_variant_lookup_value(changed, "ActiveProfile", G_VARIANT_TYPE_STRING);
+        if (v) { set_power_saver(g_variant_get_string(v, NULL)); g_variant_unref(v); }
+    }
+    if (changed) g_variant_unref(changed);
+}
+
+/// The ActiveProfile string of the first power-profiles-daemon name that answers (g_free it), or NULL.
+static char *active_power_profile(GDBusConnection *bus) {
+    for (size_t i = 0; i < sizeof power_profile_names / sizeof power_profile_names[0]; i++) {
+        GVariant *r = g_dbus_connection_call_sync(bus, power_profile_names[i][0], power_profile_names[i][1], "org.freedesktop.DBus.Properties",
+                                                  "Get", g_variant_new("(ss)", power_profile_names[i][0], "ActiveProfile"),
+                                                  G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, 1000, NULL, NULL);
+        if (!r) continue;
+        GVariant *v = NULL;
+        g_variant_get(r, "(v)", &v);
+        char *out = v && g_variant_is_of_type(v, G_VARIANT_TYPE_STRING) ? g_strdup(g_variant_get_string(v, NULL)) : NULL;
+        if (v) g_variant_unref(v);
+        g_variant_unref(r);
+        if (out) return out;
+    }
+    return NULL;
+}
+
 static void on_prepare_for_sleep(GDBusConnection *c, const gchar *sender, const gchar *path, const gchar *iface, const gchar *signal,
                                  GVariant *params, gpointer data) {
     (void)c; (void)sender; (void)path; (void)iface; (void)signal; (void)data;
@@ -265,6 +306,12 @@ static void *watch_thread(void *arg) {
                                            NULL, G_DBUS_SIGNAL_FLAGS_NONE, on_prepare_for_sleep, NULL, NULL);
         int b = get_bool(sys, "org.freedesktop.UPower", "/org/freedesktop/UPower", "org.freedesktop.UPower", "OnBattery");
         if (b >= 0) set_battery(b);
+        for (size_t i = 0; i < sizeof power_profile_names / sizeof power_profile_names[0]; i++) {
+            g_dbus_connection_signal_subscribe(sys, NULL, "org.freedesktop.DBus.Properties", "PropertiesChanged", power_profile_names[i][1],
+                                               NULL, G_DBUS_SIGNAL_FLAGS_NONE, on_power_profile_changed, NULL, NULL);
+        }
+        char *profile = active_power_profile(sys);
+        if (profile) { set_power_saver(profile); g_free(profile); }
         char *sp = session_path(sys);
         if (sp) {
             UPDATE(state.logind = 1);

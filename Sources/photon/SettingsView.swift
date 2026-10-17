@@ -82,6 +82,7 @@ struct SettingsView: View {
                     Text("Auto").tag("auto")
                 }
             }
+            EnergySection(state: state)
             Section(label("ui_settings_wallpaper_browser_transition", "Wallpaper switch")) {
                 // General setting `browsetransition` (UI getTransitionOptions; values are the engine's FADEEFFECT numbers).
                 Picker("Transition", selection: Binding(get: { state.browseTransition.mode },
@@ -314,5 +315,28 @@ struct SettingsView: View {
     private var runningApps: [String] {
         Array(Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
             .compactMap(\.localizedName))).sorted()
+    }
+}
+
+/// photon's energy controls (Energy.swift); none of these exist in Wallpaper Engine.
+struct EnergySection: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        Section("Energy") {
+            LabeledContent("Now", value: state.energy.summary)
+            Stepper(batteryLabel, value: $state.energySettings.batteryFPS, in: 0...240, step: 5)
+            Toggle("Treat Low Power Mode as battery", isOn: $state.energySettings.followLowPower)
+            Toggle("Slow down when the Mac is hot", isOn: $state.energySettings.thermalBackoff)
+            Toggle("Limit web wallpapers to the frame rate", isOn: $state.energySettings.capWebPages)
+            Text("Hot halves the frame rate; very hot pauses every wallpaper until the Mac cools. Wallpaper Engine runs web "
+                 + "wallpapers at the display's refresh rate; the limit applies on battery and when hot either way.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var batteryLabel: String {
+        let v = state.energySettings.batteryFPS
+        return "Frame rate on battery: " + (v == 0 ? "same as limit" : "\(v) fps")
     }
 }

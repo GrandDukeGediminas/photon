@@ -10,7 +10,8 @@
 // - Media sessions: MPRIS (org.mpris.MediaPlayer2.*) on the session bus, the counterpart of the WinRT
 //   GlobalSystemMediaTransportControls session winrtutil64.exe reads and of macOS MediaRemote.
 // - Playback-rule signals: UPower OnBattery, logind PrepareForSleep and the session's Lock/Unlock/LockedHint,
-//   org.freedesktop.ScreenSaver / org.gnome.ScreenSaver ActiveChanged (docs/re/09 §1.4 inputs).
+//   org.freedesktop.ScreenSaver / org.gnome.ScreenSaver ActiveChanged (docs/re/09 §1.4 inputs), and
+//   power-profiles-daemon's ActiveProfile for the energy controls.
 
 #include <stddef.h>
 #include <stdint.h>
@@ -65,6 +66,8 @@ typedef struct {
     int preparing_sleep;  // between PrepareForSleep(true) and PrepareForSleep(false)
     int locked;           // the session is locked (Lock/Unlock signals, LockedHint)
     int screensaver;      // a ScreenSaver ActiveChanged(true) without a later (false)
+    int power_profiles;   // power-profiles-daemon answered (power_saver is meaningful)
+    int power_saver;      // its ActiveProfile is "power-saver" (photon's energy controls)
     uint32_t sleep_events, lock_events, screensaver_events, battery_events;
 } photon_system_state;
 

@@ -306,6 +306,7 @@ final class X11Probe {
         photon_system_state_get(&st)
         var i = DesktopSystemInputs()
         i.onBattery = st.upower != 0 ? st.on_battery != 0 : DesktopPower.onBattery()
+        i.lowPower = st.power_saver != 0
         i.locked = st.locked != 0
         i.preparingSleep = st.preparing_sleep != 0
         i.screensaver = st.screensaver != 0 || x11ScreensaverOn()
@@ -323,6 +324,8 @@ final class X11DesktopHost {
         var rootMode = false
         var time: Float = 1
         var settings = PlaybackSettings()
+        /// photon's energy controls (`--battery-fps N`, `--low-power follow|ignore`, `--cap-web on|off`).
+        var energy = EnergySettings()
         var windowUpdateRate: Double = 1
         var noShm = false
         /// `--present swapchain|readback`: swapchain is the default wherever the device and window allow it.
@@ -600,7 +603,7 @@ final class X11DesktopHost {
             queryPointer()
             try host.frame(outputs, now: t)
             XSync(dpy, 0)
-            let interval = 1 / max(host.switching ? max(options.fps, 60) : options.fps, 1)
+            let interval = 1 / max(host.switching ? max(host.frameRate, 60) : host.frameRate, 1)
             nextFrame = max(nextFrame.addingTimeInterval(interval), Date())
             let wait = nextFrame.timeIntervalSinceNow
             if wait > 0 { Thread.sleep(forTimeInterval: wait) }
@@ -802,6 +805,7 @@ enum DesktopCommand {
             case "--maximized": o.settings.maximized = value().map(PlaybackAction.init(engineString:)) ?? o.settings.maximized
             case "--focus": o.settings.focus = value().map(PlaybackAction.init(engineString:)) ?? o.settings.focus
             case "--battery": o.settings.battery = value().map(PlaybackAction.init(engineString:)) ?? o.settings.battery
+            case "--battery-fps", "--low-power", "--cap-web": EnergyOptions.parse(a, value(), into: &o.energy)
             case "--sleep": o.settings.sleep = value().map(PlaybackAction.init(engineString:)) ?? o.settings.sleep
             default:
                 if a.hasPrefix("--") { print(usage); return 2 }
