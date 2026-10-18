@@ -179,6 +179,35 @@ package enum SteamCmdProcessError: LocalizedError {
 
 /// posix_spawn in a process group of its own, so that `terminate` also stops the steamcmd binary its launcher script
 /// runs (the script waits on it rather than exec'ing it). stdin is /dev/null: steamcmd never gets typed input.
+/// Removes terminal escape sequences from a byte stream. The Linux steamcmd colours its console even into a pipe
+/// (`password: ESC[0m`, `ESC[1mCached credentials not found.`), which hides its prompts and results from the parsers;
+/// the macOS build writes plain text. A sequence split between two reads is held until its end arrives.
+package struct TerminalEscapeFilter {
+    private enum State { case text, escape, csi }
+    private var state = State.text
+
+    package init() {}
+
+    package mutating func feed<C: Collection>(_ bytes: C) -> [UInt8] where C.Element == UInt8 {
+        var out: [UInt8] = []
+        out.reserveCapacity(bytes.count)
+        for b in bytes {
+            switch state {
+            case .text:
+                if b == 0x1b { state = .escape } else { out.append(b) }
+            case .escape:
+                // ESC [ starts a control sequence; intermediate bytes (0x20–0x2f, as in ESC ( B) continue an escape
+                // sequence and any other byte ends it.
+                if b == 0x5b { state = .csi } else if !(0x20...0x2f).contains(b) { state = .text }
+            case .csi:
+                // Parameter and intermediate bytes (0x20–0x3f) continue it; a final byte (0x40–0x7e) ends it.
+                if (0x40...0x7e).contains(b) { state = .text } else if !(0x20...0x3f).contains(b) { state = .text; out.append(b) }
+            }
+        }
+        return out
+    }
+}
+
 package final class SpawnedSteamCmd: SteamCmdProcess {
     /// Give steamcmd a pipe as standard input (`write`) instead of /dev/null.
     private let interactive: Bool
@@ -261,11 +290,12 @@ package final class SpawnedSteamCmd: SteamCmdProcess {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var buf = [UInt8](repeating: 0, count: 8192)
             var pending = Data()
+            var escapes = TerminalEscapeFilter()
             while true {
                 let n = read(readFD, &buf, buf.count)
                 if n < 0 && errno == EINTR { continue }
                 if n <= 0 { break }
-                pending.append(contentsOf: buf[0..<n])
+                pending.append(contentsOf: escapes.feed(buf[0..<n]))
                 // Only whole UTF-8 sequences go out.
                 if let s = String(data: pending, encoding: .utf8) {
                     output(s); pending.removeAll()

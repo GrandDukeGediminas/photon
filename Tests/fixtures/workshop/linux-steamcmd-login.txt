@@ -1,0 +1,13 @@
+steamcmd.sh[40911]: Starting  /tmp/photon-probe.mOAQ/steamcmd/linux32/steamcmd
+Redirecting stderr to '/tmp/photon-probe.mOAQ/home/Steam/logs/stderr.txt'
+Logging directory: '/tmp/photon-probe.mOAQ/home/Steam/logs'
+[  0%] Checking for available updates...
+[----] Verifying installation...
+UpdateUI: skip show logo
+Steam Console Client (c) Valve Corporation - version 1791918946
+-- type 'quit' to exit --
+Loading Steam API...[0mOK
+[0m"@ShutdownOnFailedCommand" = "1"
+[0m[1mCached credentials not found.
+[0m
+password: [0m

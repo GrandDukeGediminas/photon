@@ -65,6 +65,35 @@ final class SteamLoginTests: XCTestCase {
         XCTAssertEqual(l.state, .signedIn)
     }
 
+    /// The Linux steamcmd colours its console even into a pipe: "password: ESC[0m".
+    func testColouredLinuxConsole() {
+        let l = login()
+        l.start(username: "colour")
+        waitFor(l) { $0 == .needsPassword }
+        XCTAssertEqual(l.state, .needsPassword, "the prompt is recognised behind its colour reset")
+        l.submitPassword("right")
+        waitFor(l) { $0 == .signedIn }
+        XCTAssertEqual(l.state, .signedIn)
+        let wrong = login()
+        wrong.start(username: "colour")
+        waitFor(wrong) { $0 == .needsPassword }
+        wrong.submitPassword("nope")
+        waitFor(wrong) { if case .failed = $0 { return true } else { return false } }
+        XCTAssertEqual(wrong.state, .failed("Wrong username or password"))
+    }
+
+    func testEscapeFilter() {
+        var f = TerminalEscapeFilter()
+        let text = "\u{1b}[1mCached credentials not found.\n\u{1b}[0m\npassword: \u{1b}[0m"
+        XCTAssertEqual(String(decoding: f.feed(Array(text.utf8)), as: UTF8.self), "Cached credentials not found.\n\npassword: ")
+        // A sequence split across reads, one byte at a time.
+        var g = TerminalEscapeFilter()
+        let out = Array("a\u{1b}[38;5;12mb\u{1b}(Bc".utf8).flatMap { g.feed([$0]) }
+        XCTAssertEqual(String(decoding: out, as: UTF8.self), "abc")
+        var h = TerminalEscapeFilter()
+        XCTAssertEqual(String(decoding: h.feed(Array("plain – text".utf8)), as: UTF8.self), "plain – text", "UTF-8 passes through")
+    }
+
     func testApprovedInTheMobileApp() {
         let l = login()
         l.start(username: "phone")

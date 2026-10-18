@@ -11,6 +11,7 @@
 # licence for the app, "expired" has an expired one; anyone else owns it.
 # +login <user> +quit alone (the sign-in): prompts "password: " on stdin (correct: "right"); user "email" then asks for a
 # "Steam Guard code:" and "app" for a "Two-factor code:" (correct: "GOOD1"; a wrong code is refused and asked again);
+# "colour" answers like the Linux steamcmd, with terminal colour codes around its prompt and results;
 # "phone" waits for approval in the Steam Mobile app and gets it, "phoneslow" times out waiting (exit 5, as steamcmd).
 # The arguments are written to $FAKE_ARGS (one per line) when set.
 [ -n "$FAKE_ARGS" ] && printf '%s\n' "$@" >> "$FAKE_ARGS"
@@ -36,6 +37,15 @@ status=""
 for a in "$@"; do [ "$a" = "+workshop_status" ] && status=1; done
 login_only=1
 for a in "$@"; do case "$a" in +workshop_*|+licenses_for_app|+download_item) login_only="" ;; esac; done
+if [ -n "$login_only" ] && [ "$user" = colour ]; then
+  # The Linux steamcmd's console up to its password prompt, as captured from a pipe (colour codes included; a made-up
+  # user, no cached login).
+  cat "$(dirname "$0")/linux-steamcmd-login.txt"
+  read -r pw
+  [ "$pw" = right ] || { printf "\033[0mLogging in user '%s' [U:1:0] to Steam Public...\033[1mERROR (Invalid Password)\033[0m\n" "$user"; exit 5; }
+  printf "\033[0mLogging in user '%s' [U:1:1] to Steam Public...\033[0mOK\n\033[0mWaiting for user info...\033[0mOK\n" "$user"
+  exit 0
+fi
 if [ -n "$login_only" ]; then
   echo "Cached credentials not found."
   printf "password: "
