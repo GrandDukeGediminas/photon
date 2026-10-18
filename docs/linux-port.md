@@ -1008,7 +1008,7 @@ xdg-activation for the raised window was not tried.
   - `.rpm` and tarball only: `glslangValidator` and `spirv-cross` from the build image. Fedora packages glslang but
     not spirv-cross. `ShaderCompiler.defaultTool` and `SPIRVCompiler.defaultGlslang` look in `/usr/bin`,
     `/usr/local/bin`, then `<exe>/../lib/photon2/`.
-- **Version:** `Sources/CPhotonVersion/include/photon_version.h` holds `PHOTON_VERSION_BASE` (0.9.1), the one place the
+- **Version:** `Sources/CPhotonVersion/include/photon_version.h` holds `PHOTON_VERSION_BASE` (0.9.2), the one place the
   version is written. `PhotonVersion.string` (PhotonCore) returns the version stamped at build time with
   `swift build -Xcc '-DPHOTON_VERSION="<v>"'`, or the base with `-dev` appended for an unstamped build.
   `photon-linux --version`, `photon-tool --version` and `photon --version` print it; the macOS menu shows it above
@@ -1075,9 +1075,9 @@ xdg-activation for the raised window was not tried.
 - **Install:**
 
   ```sh
-  sudo apt install ./photon2_0.9.1-1~ubuntu24.04_amd64.deb   # Ubuntu 24.04+
-  sudo apt install ./photon2_0.9.1-1~deb12_amd64.deb         # Debian 12
-  sudo dnf install ./photon2-0.9.1-1.x86_64.rpm              # Fedora 40+
+  sudo apt install ./photon2_0.9.2-1~ubuntu24.04_amd64.deb   # Ubuntu 24.04+
+  sudo apt install ./photon2_0.9.2-1~deb12_amd64.deb         # Debian 12
+  sudo dnf install ./photon2-0.9.2-1.x86_64.rpm              # Fedora 40+
   systemctl --user enable --now photon2.service              # start with the graphical session (or Settings → Start at login)
   photon-linux app                                           # open the browser; the status icon stays after the window closes
   ```
