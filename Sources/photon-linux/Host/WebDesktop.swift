@@ -122,6 +122,7 @@ final class WebDesktopHost {
     /// Answered `snapshot`: the next host is taking over; pages pause and go quiet.
     private var handedOver = false
     private var readyAnnounced = false
+    private var readyAt: Date?
     private lazy var device: MTLDevice? = MTLCreateSystemDefaultDevice()
     private lazy var queue: MTLCommandQueue? = device?.makeCommandQueue()
 
@@ -507,6 +508,26 @@ final class WebDesktopHost {
         }
     }
 
+    /// `--seconds` has passed: the run ends unless the pages are still loading, which a slow machine (a busy CI runner
+    /// starting WebKit's processes) can take longer than the whole run for. Then the pages get `loadGrace` more seconds
+    /// to load and `settleTime` after loading to run their first scripts, so the results describe a loaded page.
+    private func finished(after seconds: Double, start: Date, now: Date) -> Bool {
+        // Nothing to wait for while a stop rule has freed the pages.
+        if stopped || pages.isEmpty { return true }
+        if let readyAt {
+            if readyAt.timeIntervalSince(start) < seconds { return true }
+            guard now.timeIntervalSince(readyAt) >= Self.settleTime else { return false }
+            print("web: pages loaded after \(String(format: "%.1f", readyAt.timeIntervalSince(start))) s, past --seconds \(seconds)")
+            return true
+        }
+        guard now.timeIntervalSince(start) >= seconds + Self.loadGrace else { return false }
+        print("web: pages still loading after \(Int(seconds + Self.loadGrace)) s")
+        return true
+    }
+
+    static let loadGrace: Double = 30
+    static let settleTime: Double = 2
+
     // MARK: Loop
 
     func run() {
@@ -518,7 +539,7 @@ final class WebDesktopHost {
         while true {
             _ = photon_web_iterate(5)
             let now = Date()
-            if let s = options.seconds, now.timeIntervalSince(start) >= s { break }
+            if let s = options.seconds, now.timeIntervalSince(start) >= s, finished(after: s, start: start, now: now) { break }
             for c in control?.poll() ?? [] {
                 switch c {
                 case .pause(let p): appPaused = p; lastEvaluation = .distantPast
@@ -536,6 +557,7 @@ final class WebDesktopHost {
             for p in pages where p.switchState != nil { drawSwitch(p, now: now) }
             if !readyAnnounced, !pages.isEmpty, pages.allSatisfy({ $0.loaded || $0.switchState != nil }) {
                 readyAnnounced = true
+                readyAt = now
                 print("host: ready")
             }
             if monitorsChanged {
