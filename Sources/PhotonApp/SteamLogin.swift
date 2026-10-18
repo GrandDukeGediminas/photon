@@ -168,6 +168,14 @@ package final class SteamLogin: ObservableObject {
     package static let approveMessage = "Approve the sign-in in the Steam Mobile app on your phone…"
     /// steamcmd gave up waiting for that approval (about a minute) and stopped.
     package static let approvalTimedOut = "The sign-in wasn't approved in the Steam Mobile app in time. Try again and approve it on your phone."
+    /// After the password. steamcmd prints nothing while it waits for the Steam Mobile app (its "Waiting for
+    /// confirmation" goes only to its connection log), so the approval is mentioned up front.
+    package static let signingInMessage = "Signing in… If your account has Steam Guard two-factor, check your phone and approve the sign-in in the Steam app."
+    /// steamcmd stopped after the password without saying why: usually the minute it waits for that approval ran out.
+    package static func unfinished(status: Int32) -> String {
+        "The sign-in didn't finish (steamcmd status \(status)). If your account uses the Steam Mobile app, try again and "
+            + "approve the sign-in on your phone within a minute."
+    }
 
     package init() {}
 
@@ -203,7 +211,7 @@ package final class SteamLogin: ObservableObject {
 
     package func submitPassword(_ password: String) {
         guard state == .needsPassword, let p = process else { return }
-        state = .working("Signing in…")
+        state = .working(Self.signingInMessage)
         p.write(password + "\n")
     }
 
@@ -245,7 +253,7 @@ package final class SteamLogin: ObservableObject {
         // "Please confirm the login in the Steam Mobile app on your phone." then "Waiting for confirmation..." with no
         // line end until it is approved.
         if lower.contains("confirm the login in the steam mobile app") || lower.hasPrefix("waiting for confirmation") {
-            if lower.hasSuffix("ok") { state = .working("Signing in…") } else if state != .signedIn { state = .working(Self.approveMessage) }
+            if lower.hasSuffix("ok") { state = .working(Self.signingInMessage) } else if state != .signedIn { state = .working(Self.approveMessage) }
             return
         }
         if lower.hasSuffix("password:") {
@@ -276,7 +284,7 @@ package final class SteamLogin: ObservableObject {
                 state = .failed(Self.explain(String(line[open.upperBound..<close.lowerBound])))
                 return
             }
-            state = .working("Signing in…")
+            if state != .working(Self.approveMessage) { state = .working(Self.signingInMessage) }
             return
         }
         if lower.hasPrefix("waiting for user info") && lower.hasSuffix("ok") { state = .signedIn }
@@ -289,6 +297,7 @@ package final class SteamLogin: ObservableObject {
         case .signedIn, .failed: break
         case .needsPassword, .needsCode: state = .failed("steamcmd stopped before signing in")
         case .working(Self.approveMessage): state = .failed(Self.approvalTimedOut)
+        case .working(Self.signingInMessage) where status != 0: state = .failed(Self.unfinished(status: status))
         default: state = .failed(Self.stopped(status: status, lastLine: lastLine))
         }
     }

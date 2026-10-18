@@ -51,24 +51,30 @@ final class LinuxApp {
     private var ownershipWindow: OwnershipWindow?
     private(set) var started = false
 
-    /// `start` once the account owns Wallpaper Engine: at once after a recent success (re-checked in the background when
-    /// a week old; only a definite "not owned" then quits), else after the ownership window's check passes.
+    /// `start` once the account owns Wallpaper Engine and its files are there: at once after a recent success (re-checked
+    /// in the background when a week old; only a definite "not owned" then quits), with new subscriptions fetched in the
+    /// background; else after the setup window has checked and downloaded the files (it then shows the subscriptions
+    /// downloading).
     func startWhenOwned(showBrowser: Bool) {
         LinuxApp.current = self
-        if ownership.mayStart {
+        let workshop: WorkshopController = state.workshop
+        if ownership.mayStart && workshop.engineFilesInstalled {
             start(showBrowser: showBrowser)
             if ownership.dueForRecheck {
                 ownership.check { [weak self] status in
-                    guard status == .notOwned else { return }
+                    // One steamcmd at a time: the subscriptions are fetched after the check.
+                    guard status == .notOwned else { return workshop.syncSubscriptions() }
                     print("photon: this Steam account doesn't own Wallpaper Engine; quitting")
                     self?.quit()
                 }
+            } else {
+                workshop.syncSubscriptions()
             }
         } else {
-            ownershipWindow = OwnershipWindow(app: self) { [weak self] in
-                self?.ownershipWindow = nil
-                self?.start(showBrowser: showBrowser)
-            }
+            if !workshop.engineFilesInstalled { print("photon: Wallpaper Engine's files aren't in \(state.engineAssets.path); setup downloads them") }
+            ownershipWindow = OwnershipWindow(app: self, owned: ownership.mayStart,
+                                              start: { [weak self] in self?.start(showBrowser: showBrowser) },
+                                              finished: { [weak self] in self?.ownershipWindow = nil })
         }
     }
 

@@ -69,12 +69,12 @@ enum LibraryPaths {
             .appendingPathComponent(".local/share/Steam/steamapps/workshop/content/431960")
     }
 
-    /// The engine's `assets` folder: PHOTON_WE_ASSETS, `<saved install>/assets`, Steam's, or the default Steam path.
+    /// The engine's `assets` folder: PHOTON_WE_ASSETS, `<saved install>/assets`, Steam's, or photon's own copy (downloaded
+    /// at setup, EngineFiles).
     static func engineAssets(_ defaults: UserDefaults) -> URL {
         if let p = ProcessInfo.processInfo.environment["PHOTON_WE_ASSETS"], !p.isEmpty { return URL(fileURLWithPath: p) }
         if let p = defaults.string(forKey: installKey), !p.isEmpty { return URL(fileURLWithPath: p).appendingPathComponent("assets") }
-        return (detectInstall() ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".local/share/Steam/steamapps/common/wallpaper_engine")).appendingPathComponent("assets")
+        return (detectInstall() ?? EngineFiles.installDirectory).appendingPathComponent("assets")
     }
 
     /// The library folders AppState scans: the workshop, then the install's default and own projects (as on macOS), and

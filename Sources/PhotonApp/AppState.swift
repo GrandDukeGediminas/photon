@@ -52,7 +52,7 @@ package final class AppState: ObservableObject {
     /// Ids the blocklist hides: they are left out of `items` (so the browser, playlists and the renderer never see them),
     /// out of Workshop results, and aren't downloaded. Re-read with every library scan.
     @Published package private(set) var hiddenIDs: Set<String> = []
-    package let strings: LocalizedStrings
+    package private(set) var strings: LocalizedStrings
 
     @Published package private(set) var items: [WallpaperItem] = []
     @Published package private(set) var displays: [DisplayInfo] = DisplayInfo.current
@@ -291,6 +291,15 @@ package final class AppState: ObservableObject {
     package func setGeneral(_ key: String, to value: Any, of id: String) {
         overrides[id, default: [:]][key] = value
         saveOverrides()
+    }
+
+    /// Wallpaper Engine's files arrived in `engineAssets`' install (EngineDownloader): its strings, colour filters and
+    /// default projects are read again.
+    package func engineFilesChanged() {
+        let install = engineAssets.deletingLastPathComponent()
+        strings = LocalizedStrings(installDirectory: install)
+        Library.lutFilterFiles = Library.loadLUTFilters(install: install)
+        reloadLibrary()
     }
 
     package func reloadLibrary() {

@@ -116,6 +116,29 @@ package final class WorkshopController: ObservableObject {
         return l
     }()
 
+    /// Downloads Wallpaper Engine's files when no install has them (see EngineFiles).
+    package lazy var engine: EngineDownloader = {
+        let e = EngineDownloader()
+        e.username = { [weak self] in self?.username ?? "" }
+        e.executable = { [weak self] in self?.steamcmdExecutable }
+        e.environment = queue.environment
+        e.queue = queue
+        return e
+    }()
+
+    /// Whether the engine assets photon reads are there.
+    package var engineFilesInstalled: Bool { state.map { EngineFiles.isInstalled(assets: $0.engineAssets) } ?? false }
+
+    /// Downloads Wallpaper Engine's files into the install photon reads (`engineAssets`' parent), then reloads what
+    /// AppState reads from it.
+    package func downloadEngineFiles(completion: ((String?) -> Void)? = nil) {
+        guard let state else { return }
+        engine.download(into: state.engineAssets.deletingLastPathComponent()) { [weak state] problem in
+            if problem == nil { state?.engineFilesChanged() }
+            completion?(problem)
+        }
+    }
+
     package func setUpSteamCmd(completion: ((String?) -> Void)? = nil) {
         installer.install { [weak self] path in
             self?.objectWillChange.send()
@@ -217,6 +240,7 @@ package final class WorkshopController: ObservableObject {
         guard !entries.isEmpty else {
             subscribedLoading = false
             subscribedUnavailable = 0
+            downloadAfterLoadIfAsked()
             return
         }
         subscribedLoading = true
@@ -234,6 +258,7 @@ package final class WorkshopController: ObservableObject {
                    let data = try? JSONEncoder().encode(SubscribedCache(items: subscribed, otherApps: otherApps.sorted())) {
                     try? data.write(to: file, options: .atomic)
                 }
+                downloadAfterLoadIfAsked()
                 return
             }
             let chunk = Array(ids[start..<min(start + 100, ids.count)])
@@ -257,6 +282,7 @@ package final class WorkshopController: ObservableObject {
                 case .failure(let e):
                     self.subscribedLoading = false
                     self.subscribedError = e.localizedDescription
+                    self.downloadAfterLoadIfAsked()
                 }
             }
         }
@@ -359,6 +385,50 @@ package final class WorkshopController: ObservableObject {
             }
         }
         return (count, ids)
+    }
+
+    // MARK: subscriptions, automatically
+
+    /// Ids the last `syncSubscriptions` queued, for its progress.
+    @Published package private(set) var syncQueued: [String] = []
+    private var downloadAfterLoad = false
+
+    /// Asks Steam for the subscription list, then downloads every subscribed item that isn't in the library (after setup
+    /// and at every launch). Uses the saved list when steamcmd can't run now.
+    package func syncSubscriptions() {
+        downloadAfterLoad = true
+        if refreshSubscriptionsFromSteam() != nil { loadSubscribed() }
+    }
+
+    /// The automatic downloads: how many finished, how many were queued, and the one running.
+    package var syncProgress: (done: Int, total: Int, current: String?)? {
+        guard !syncQueued.isEmpty else { return nil }
+        let done = syncQueued.filter { queue.job($0)?.phase.isFinished ?? true }.count
+        return (done, syncQueued.count, queue.current?.title)
+    }
+
+    /// Asked for (`syncSubscriptions`) and not finished: the subscription list or the downloads.
+    package var syncing: Bool {
+        if downloadAfterLoad { return true }
+        guard let p = syncProgress else { return false }
+        return p.done < p.total
+    }
+
+    /// Subscribed items that aren't downloaded and photon can show, whatever the tab's search and type filters (the
+    /// content filter and rating still apply).
+    package var missingSubscribed: [WorkshopItem] {
+        let hidden = state?.hiddenIDs ?? []
+        return subscribed.filter {
+            !hidden.contains($0.id) && rating.allows($0) && status(of: $0) == .notInstalled && $0.unsupportedReason == nil
+        }
+    }
+
+    private func downloadAfterLoadIfAsked() {
+        guard downloadAfterLoad else { return }
+        downloadAfterLoad = false
+        var ids: [String] = []
+        for item in missingSubscribed where download(item) == nil { ids.append(item.id) }
+        syncQueued = ids
     }
 
     /// Queues every subscribed item the tab shows that isn't downloaded and photon can show. Returns how many were

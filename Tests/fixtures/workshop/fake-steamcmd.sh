@@ -12,7 +12,9 @@
 # +login <user> +quit alone (the sign-in): prompts "password: " on stdin (correct: "right"); user "email" then asks for a
 # "Steam Guard code:" and "app" for a "Two-factor code:" (correct: "GOOD1"; a wrong code is refused and asked again);
 # "colour" answers like the Linux steamcmd, with terminal colour codes around its prompt and results;
-# "phone" waits for approval in the Steam Mobile app and gets it, "phoneslow" times out waiting (exit 5, as steamcmd).
+# "phonequiet" waits silently for the Steam Mobile app, as the real steamcmd does, and gives up (exit 5); "phone" and
+# "phoneslow" announce the wait, then get the approval or time out.
+# +app_update: see below.
 # The arguments are written to $FAKE_ARGS (one per line) when set.
 [ -n "$FAKE_ARGS" ] && printf '%s\n' "$@" >> "$FAKE_ARGS"
 id=""
@@ -36,7 +38,7 @@ echo "Loading Steam API...OK"
 status=""
 for a in "$@"; do [ "$a" = "+workshop_status" ] && status=1; done
 login_only=1
-for a in "$@"; do case "$a" in +workshop_*|+licenses_for_app|+download_item) login_only="" ;; esac; done
+for a in "$@"; do case "$a" in +workshop_*|+licenses_for_app|+download_item|+app_update) login_only="" ;; esac; done
 if [ -n "$login_only" ] && [ "$user" = colour ]; then
   # The Linux steamcmd's console up to its password prompt, as captured from a pipe (colour codes included; a made-up
   # user, no cached login).
@@ -65,6 +67,13 @@ if [ -n "$login_only" ]; then
         [ "$user" = email ] && echo "That Steam Guard code was invalid." || echo "Two-factor code mismatch"
       done
       ;;
+    phonequiet)
+      # What steamcmd actually prints while it waits for the Steam Mobile app: nothing after "Logging in user", then it
+      # gives up after a minute with status 5.
+      printf "Logging in user '%s' [U:1:0] to Steam Public..." "$user"
+      sleep 0.3
+      exit 5
+      ;;
     phone|phoneslow)
       echo "This account is protected by a Steam Guard mobile authenticator."
       echo "Please confirm the login in the Steam Mobile app on your phone."
@@ -82,6 +91,36 @@ if [ -n "$login_only" ]; then
   echo "Waiting for user info...OK"
   exit 0
 fi
+# +app_update 431960 (Wallpaper Engine's files) into +force_install_dir: progress lines, then assets/shaders and
+# assets/materials; user "nospace" fails as on a full disk, "noowner" has no licence.
+appdir=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = "+force_install_dir" ] && appdir="$a"
+  prev="$a"
+done
+for a in "$@"; do
+  if [ "$a" = "+app_update" ]; then
+    printf "Logging in user '%s' [U:1:1] to Steam Public...OK\n" "$user"
+    echo "Waiting for user info...OK"
+    case "$user" in
+      noowner) echo "ERROR! Failed to install app '431960' (No subscription)"; exit 8 ;;
+      nospace)
+        echo " Update state (0x61) downloading, progress: 10.00 (100 / 1000)"
+        echo "Error! App '431960' state is 0x202 after update job."
+        exit 8
+        ;;
+    esac
+    echo " Update state (0x3) reconfiguring, progress: 0.00 (0 / 0)"
+    echo " Update state (0x61) downloading, progress: 25.00 (250000000 / 1000000000)"
+    sleep "${FAKE_APP_DELAY:-0.2}"
+    echo " Update state (0x61) downloading, progress: 75.00 (750000000 / 1000000000)"
+    echo " Update state (0x81) verifying update, progress: 90.00 (900000000 / 1000000000)"
+    mkdir -p "$appdir/assets/shaders" "$appdir/assets/materials" "$appdir/projects/defaultprojects"
+    echo "Success! App '431960' fully installed."
+    exit 0
+  fi
+done
 licenses=""
 for a in "$@"; do [ "$a" = "+licenses_for_app" ] && licenses=1; done
 [ -n "$status$licenses" ] && [ "$user" = "nologin" ] && id=200

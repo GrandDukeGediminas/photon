@@ -54,9 +54,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if ownership.mayStart {
+        // Owned recently and Wallpaper Engine's files are there: start, then fetch new subscriptions in the background.
+        // Otherwise the setup window checks, downloads the files and starts.
+        if ownership.mayStart && state.workshop.engineFilesInstalled {
             start()
-            if ownership.dueForRecheck { recheckOwnership() }
+            if ownership.dueForRecheck { recheckOwnership() } else { state.workshop.syncSubscriptions() }
         } else {
             showOwnershipGate()
         }
@@ -64,12 +66,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// The window shown until the account passes the ownership check.
     private func showOwnershipGate() {
-        let view = OwnershipGateView(ownership: ownership, workshop: state.workshop) { [weak self] in
-            guard let self else { return }
-            self.gate?.close()
-            self.gate = nil
-            self.start()
-        }
+        let view = OwnershipGateView(ownership: ownership, workshop: state.workshop, owned: ownership.mayStart,
+                                     start: { [weak self] in self?.start() },
+                                     close: { [weak self] in self?.gate?.close(); self?.gate = nil })
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 360), styleMask: [.titled, .closable],
                          backing: .buffered, defer: false)
         w.title = "photon"
@@ -89,7 +88,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// the last success until its grace period ends.
     private func recheckOwnership() {
         ownership.check { [weak self] status in
-            guard let self, status == .notOwned else { return }
+            guard let self else { return }
+            // One steamcmd at a time: the subscriptions are fetched after the check.
+            guard status == .notOwned else { return self.state.workshop.syncSubscriptions() }
             let alert = NSAlert()
             alert.messageText = "Wallpaper Engine isn't owned by this Steam account"
             alert.informativeText = "photon requires a Steam account that owns Wallpaper Engine: its wallpapers come from "
@@ -293,8 +294,12 @@ let home = FileManager.default.homeDirectoryForCurrentUser
 // steamcmd's workshop folder (where the Workshop tab downloads to), then CrossOver Steam's; a duplicate id comes from
 // the first.
 let workshop = WorkshopPaths.steamcmdContent
-let engineAssets = URL(fileURLWithPath: ProcessInfo.processInfo.environment["PHOTON_WE_ASSETS"]
-    ?? home.appendingPathComponent("Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/wallpaper_engine/assets").path)
+// Wallpaper Engine's files: PHOTON_WE_ASSETS, CrossOver Steam's install, else photon's own copy (downloaded at setup,
+// EngineFiles).
+let crossOverAssets = home.appendingPathComponent(
+    "Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/wallpaper_engine/assets")
+let engineAssets = ProcessInfo.processInfo.environment["PHOTON_WE_ASSETS"].map { URL(fileURLWithPath: $0) }
+    ?? (EngineFiles.isInstalled(assets: crossOverAssets) ? crossOverAssets : EngineFiles.installDirectory.appendingPathComponent("assets"))
 let install = engineAssets.deletingLastPathComponent()
 
 let state = AppState(engineAssets: engineAssets, libraryDirectories: WorkshopPaths.workshopLibraries + [

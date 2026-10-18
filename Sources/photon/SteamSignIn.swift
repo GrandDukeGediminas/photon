@@ -78,12 +78,13 @@ struct SteamSignInView: View {
                 Button("Continue", action: sendCode).keyboardShortcut(.defaultAction).disabled(code.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         case .working(let s):
-            HStack { ProgressView().controlSize(.small); Text(s) }
+            HStack(alignment: .firstTextBaseline) { ProgressView().controlSize(.small); Text(s).fixedSize(horizontal: false, vertical: true) }
         case .signedIn:
             Label("Signed in. steamcmd will remember this login.", systemImage: "checkmark.circle").foregroundStyle(.green)
         case .idle, .failed:
             if case .failed(let message) = login.state {
                 Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("steamcmd needs to sign in to Steam once. Your password goes only to steamcmd; photon doesn't keep it.")
                 .font(.callout).fixedSize(horizontal: false, vertical: true)

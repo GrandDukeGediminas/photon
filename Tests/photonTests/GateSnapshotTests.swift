@@ -18,9 +18,15 @@ final class GateSnapshotTests: XCTestCase {
         let o = OwnershipCheck(workshop: w, defaults: d.defaults)
         o.environment = ["PATH": "/usr/bin:/bin"]
         w.signIn.environment = o.environment
+        // Never this Mac's own subscription files.
+        w.subscriptionSource = { SteamSubscriptions.load(files: []) }
+        w.subscribedCacheFile = nil
 
-        func shot(_ name: String) {
-            let host = NSHostingView(rootView: OwnershipGateView(ownership: o, workshop: w, passed: {}))
+        func shot(_ name: String, owned: Bool = false) {
+            render(name, OwnershipGateView(ownership: o, workshop: w, owned: owned, start: {}, close: {}))
+        }
+        func render<V: View>(_ name: String, _ view: V) {
+            let host = NSHostingView(rootView: view)
             host.frame = NSRect(x: 0, y: 0, width: 520, height: 440)
             let win = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
             win.contentView = host
@@ -51,5 +57,22 @@ final class GateSnapshotTests: XCTestCase {
         w.username = "noowner"
         o.check(); spin { o.status != .checking }
         shot("6-notowned.png")
+
+        // Wallpaper Engine's files: downloading (the fake pauses at 25%), failed, then the subscriptions.
+        w.username = "someone"
+        w.engine.environment = ["PATH": "/usr/bin:/bin", "FAKE_APP_DELAY": "3"]
+        w.downloadEngineFiles()
+        spin { if case .running(_, _?, _) = w.engine.state { return true }; return false }
+        render("7-engine.png", VStack(alignment: .leading, spacing: 12) { EngineFilesView(engine: w.engine, retry: {}); Spacer() }
+            .padding(20).frame(width: 520, height: 440, alignment: .topLeading))
+        spin { !w.engine.isRunning }
+        w.username = "nospace"
+        w.downloadEngineFiles()
+        spin { !w.engine.isRunning }
+        render("8-engine-failed.png", VStack(alignment: .leading, spacing: 12) { EngineFilesView(engine: w.engine, retry: {}); Spacer() }
+            .padding(20).frame(width: 520, height: 440, alignment: .topLeading))
+        w.username = "someone"
+        shot("9-subscriptions.png", owned: true)
+        spin { !w.syncing }
     }
 }

@@ -105,6 +105,17 @@ final class SteamLoginTests: XCTestCase {
         XCTAssertEqual(l.state, .signedIn)
     }
 
+    /// The real steamcmd prints nothing while it waits for the Steam Mobile app, then stops with status 5.
+    func testSilentWaitForTheMobileApp() {
+        let l = login()
+        l.start(username: "phonequiet")
+        waitFor(l) { $0 == .needsPassword }
+        l.submitPassword("right")
+        XCTAssertEqual(l.state, .working(SteamLogin.signingInMessage), "the approval is mentioned while it waits")
+        waitFor(l) { _ in !l.isRunning }
+        XCTAssertEqual(l.state, .failed(SteamLogin.unfinished(status: 5)))
+    }
+
     func testNotApprovedInTime() {
         let l = login()
         l.start(username: "phoneslow")

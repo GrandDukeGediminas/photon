@@ -956,8 +956,9 @@ return at once.
 
 **Library folders** (`LibraryPaths.swift`): the Workshop folder is `PHOTON_WORKSHOP`, the `workshopdir` setting, or the
 first `steamapps/workshop/content/431960` found in the library folders (`libraryfolders.vdf`) of `~/.local/share/Steam`,
-`~/.steam/steam`, `~/.steam/root` or Steam's Flatpak; the engine assets are `PHOTON_WE_ASSETS`, `<weinstalldir>/assets`
-or `steamapps/common/wallpaper_engine/assets`. The library is the Workshop folder plus the install's
+`~/.steam/steam`, `~/.steam/root` or Steam's Flatpak; the engine assets are `PHOTON_WE_ASSETS`, `<weinstalldir>/assets`,
+`steamapps/common/wallpaper_engine/assets`, or photon's own copy in `~/.local/share/photon2/wallpaper_engine/assets`,
+which the setup window downloads with steamcmd when none of the others has the files (`EngineFiles.swift`). The library is the Workshop folder plus the install's
 `projects/defaultprojects` and `projects/myprojects` (as on macOS) plus `PHOTON_LIBRARY` (colon-separated).
 
 **Checked** (`scripts/linux/in-container/app-check.sh`): under Xvfb (1600×1000) and under headless sway, each with a
@@ -1008,7 +1009,7 @@ xdg-activation for the raised window was not tried.
   - `.rpm` and tarball only: `glslangValidator` and `spirv-cross` from the build image. Fedora packages glslang but
     not spirv-cross. `ShaderCompiler.defaultTool` and `SPIRVCompiler.defaultGlslang` look in `/usr/bin`,
     `/usr/local/bin`, then `<exe>/../lib/photon2/`.
-- **Version:** `Sources/CPhotonVersion/include/photon_version.h` holds `PHOTON_VERSION_BASE` (0.9.2), the one place the
+- **Version:** `Sources/CPhotonVersion/include/photon_version.h` holds `PHOTON_VERSION_BASE` (0.9.3), the one place the
   version is written. `PhotonVersion.string` (PhotonCore) returns the version stamped at build time with
   `swift build -Xcc '-DPHOTON_VERSION="<v>"'`, or the base with `-dev` appended for an unstamped build.
   `photon-linux --version`, `photon-tool --version` and `photon --version` print it; the macOS menu shows it above
@@ -1018,8 +1019,8 @@ xdg-activation for the raised window was not tried.
   `appimage-build.sh` refuses a Debian 12 binary stamped with another version, and the Flatpak manifest stamps the base.
   The install tests compare `--version` with the installed package's upstream version (`dpkg-query`, `rpm -q`), the
   AppImage's file name, and the source tree's base (Flatpak).
-- **Assets:** like macOS, photon2 reads the user's own Wallpaper Engine install and Steam Workshop folder; nothing from
-  Wallpaper Engine is packaged. The app finds Steam's folders itself (§6.1); the CLI subcommands still default to the
+- **Assets:** like macOS, photon2 reads the user's own Wallpaper Engine install (or the copy it downloads with the
+  user's account) and Steam Workshop folder; nothing from Wallpaper Engine is packaged. The app finds Steam's folders itself (§6.1); the CLI subcommands still default to the
   container mount points `/we/assets` and `/workshop` (`PHOTON_WE_ASSETS`, `PHOTON_WORKSHOP` override).
 - **Files** (`packaging/linux/`): `photon2.desktop` (`Exec=photon-linux app`), `photon2-autostart.desktop`
   (`--background`), `photon2.svg` (rendered to 32 to 256 px PNGs), `photon2.service` (systemd user unit: `PartOf=` /
@@ -1075,9 +1076,9 @@ xdg-activation for the raised window was not tried.
 - **Install:**
 
   ```sh
-  sudo apt install ./photon2_0.9.2-1~ubuntu24.04_amd64.deb   # Ubuntu 24.04+
-  sudo apt install ./photon2_0.9.2-1~deb12_amd64.deb         # Debian 12
-  sudo dnf install ./photon2-0.9.2-1.x86_64.rpm              # Fedora 40+
+  sudo apt install ./photon2_0.9.3-1~ubuntu24.04_amd64.deb   # Ubuntu 24.04+
+  sudo apt install ./photon2_0.9.3-1~deb12_amd64.deb         # Debian 12
+  sudo dnf install ./photon2-0.9.3-1.x86_64.rpm              # Fedora 40+
   systemctl --user enable --now photon2.service              # start with the graphical session (or Settings → Start at login)
   photon-linux app                                           # open the browser; the status icon stays after the window closes
   ```
